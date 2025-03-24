@@ -1,0 +1,1 @@
+This folder contains various chats I used with AI to "vibe code" this project. I used a combination of Ollama, VS Code, the Continue extension for VS Code, and several free models hosted both locally and on OpenRouter.
