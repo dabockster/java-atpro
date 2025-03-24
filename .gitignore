@@ -1,0 +1,62 @@
+# .gitignore for atproto-java
+
+# Maven Build Output
+target/
+
+# Maven dependency download cache  (Optional, but usually a good idea)
+.m2/repository/
+
+# IDE-Specific Files (IntelliJ IDEA)
+.idea/
+*.iml
+*.ipr
+*.iws
+
+# Eclipse
+.classpath
+.project
+.settings/
+target/
+
+# Netbeans
+nbproject/
+.nb-gradle/
+build/
+
+# VS Code
+.vscode/
+
+# OS-Generated Files
+.DS_Store
+Thumbs.db
+
+# Backup Files
+*.bak
+*.swp
+*~
+*.orig
+
+# Logs
+*.log
+
+# Byte code and compiled resources
+*.class
+*.war
+*.ear
+*.zip
+*.tar.gz
+*.rar
+
+# Dependency-reduced POM (if you generate one)
+dependency-reduced-pom.xml
+
+# Other common temporary files
+*.tmp
+*.bak
+
+# Maven Wrapper (if not committed)
+.mvn/wrapper/maven-wrapper.jar
+# !.mvn/wrapper/MavenWrapperDownloader.java # Uncomment if using source distribution.
+# !.mvn/wrapper/maven-wrapper.properties    #  Keep wrapper config
+# !mvnw                                      #  Keep wrapper script (Unix)
+# !mvnw.cmd                                  #  Keep wrapper script (Windows)
