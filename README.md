@@ -11,7 +11,7 @@ atproto-java/
 │   │   ├── java/
 │   │   │   ├── com/
 │   │   │   │   ├── atproto/
-│   │   │   │       ├── api/        // API-specific code (client logic, XRPC)
+│   │   │   │       ├── api/
 │   │   │   │       │    ├── AtpAgent.java
 │   │   │   │       │    ├── AtpResponse.java
 │   │   │   │       │    ├── AtpSession.java
@@ -20,63 +20,90 @@ atproto-java/
 │   │   │   │       │    │    ├── XrpcRequest.java
 │   │   │   │       │    │    ├── XrpcResponse.java
 │   │   │   │       │    │    ├── XrpcException.java
-│   │   │   │       │    │    ├── models/
-│   │   │   │       │    │    │    └── Params.java
-│   │   │   │       │    └── ...
-│   │   │   │       ├── common/      // Shared code and utilities
+│   │   │   │       │    │    ├── model/
+│   │   │   │       │    │    │   └── Params.java
+│   │   │   │       │    │    └── HttpUtil.java  // Moved up a level
+│   │   │   │       ├── common/
 │   │   │   │       │    ├── AtProtoException.java
-│   │   │   │       │    └── ...
-│   │   │   │       ├── crypto/      // Cryptographic utilities (simplified)
+│   │   │   │       │    ├── Nsid.java
+│   │   │   │       │    ├── Cid.java
+│   │   │   │       │    ├── AtUri.java
+│   │   │   │       │    ├── Did.java
+│   │   │   │       │    └── Handle.java
+│   │   │   │       ├── crypto/
 │   │   │   │       │    ├── SigningUtil.java
 │   │   │   │       │    └── KeySerialization.java
-│   │   │   │       ├── identity/    // DID and handle resolution
+│   │   │   │       ├── identity/
 │   │   │   │       │    ├── IdentityResolver.java
-│   │   │   │       │    └── ...
-│   │   │   │       ├── models/      // Data models (mirroring Lexicon namespaces)
+│   │   │   │       │    ├── DidResolver.java
+│   │   │   │       │    └── HandleResolver.java
+│   │   │   │       ├── models/      // All files under here are GENERATED
 │   │   │   │       │    ├── com/
 │   │   │   │       │    │   ├── atproto/
 │   │   │   │       │    │   │   ├── repo/
-│   │   │   │       │    │   │   │   ├── CreateRecordRequest.java
-│   │   │   │       │    │   │   │   └── ...
-│   │   │   │       │    │   │   └── ...
-│   │   │   │       │    │   └── ...
+│   │   │   │       │    │   │   │   ├── CreateRecordRequest.java  **[GENERATED]**
+│   │   │   │       │    │   │   │   ├── CreateRecordResponse.java **[GENERATED]**
+│   │   │   │       │    │   │   │   ├── ListRecordsRequest.java   **[GENERATED]**
+│   │   │   │       │    │   │   │   └── ListRecordsResponse.java  **[GENERATED]**
+│   │   │   │       │    │   │   ├── identity/  **[GENERATED]**
+│   │   │   │       │    │   │   └── ...          **[GENERATED]**
+│   │   │   │       │    │   └── ...             **[GENERATED]**
 │   │   │   │       │    ├── app/
 │   │   │   │       │    │   ├── bsky/
-│   │   │   │       │    │   │    ├── feed/
-│   │   │   │       │    │   │    │    └── Post.java
-│   │   │   │       │    │   │    └── ...
-│   │   │   │       │    │   └── ...
-│   │   │   │        │    └── ...
-│   │   │   │       ├── RichText.java    // RichText processing
-│   │   │    	   ├── moderation/
-│   │   │   │	   │         └── ModerationAction.java
-│   │   │   │       └── typeguards/
-│   │   │   │            ├── AppBskyFeedDefs.java
-│   │   │   │            ├── AppBskyFeedPost.java
-│   │   │   │            └── ...
-│   │   ├── test/
-│   │   │   ├── java/
-│   │   │   │  ├── com/
-│   │   │   │  │   ├── atproto/
-│   │   │   │  │       ├── api/
-│   │   │   │  │       │   ├── AtpAgentTest.java
-│   │   │   │  │       │   ├── xrpc/
-│   │   │   │  │       │   │   ├── models/
-│   │   │   │  │       │   │   │   └── ParamsTest.java
-│   │   │   │  │       │   │   └── XrpcClientTest.java
-│   │   │   │  │       ├── common/
-│   │   │   │  │       ├── crypto/
-│   │   │   │  │       ├── identity/
-│   │   │   │  │       ├── models/
-│   │   │   │  │       │    ├── com/
-│   │   │   │  │       │    │   └── ...  // Tests for model classes
-│   │   │   │  │       │    └── ...
-│   │   │   │	     ├── moderation/ (Moderation related functionality)
-│   │   │   │       │	     ├── ModerationActionTest.java	
-│   │   │   │       └── ... // Other test classes
-│   └── resources/  // (Test resources, if any)
-│
-├── build.gradle.kts (or pom.xml)
+│   │   │   │       │    │   │   ├── feed/
+│   │   │   │       │    │   │   │   ├── GetTimelineRequest.java  **[GENERATED]**
+│   │   │   │       │    │   │   │   ├── GetTimelineResponse.java **[GENERATED]**
+│   │   │   │       │    │   │   │   └── Post.java                **[GENERATED]**
+│   │   │   │       │    │   │   └── ...                         **[GENERATED]**
+│   │   │   │       │    │   └── ...                            **[GENERATED]**
+│   │   │   │       │    └── ...                                 **[GENERATED]**
+│   │   │   │       ├── RichText.java  // Manually created, handles rich text.
+│   │   │   │       ├── moderation/
+│   │   │   │       │    └── ModerationAction.java // Manually created
+│   │   │   │       └── codegen/
+│   │   │   │            ├── LexiconParser.java
+│   │   │   │            ├── ModelGenerator.java
+│   │   │   │            ├── ClientGenerator.java
+│   │   │   │            └── Generator.java
+│   ├── test/
+│   │   ├── java/
+│   │   │   ├── com/
+│   │   │   │   ├── atproto/
+│   │   │   │   │   ├── api/
+│   │   │   │   │   │    ├── AtpAgentTest.java
+│   │   │   │   │   │    └── xrpc/
+│   │   │   │   │   │        └── XrpcClientTest.java
+│   │   │   │   │   ├── common/
+│   │   │   │   │   │    └── AtUriTest.java  // Example test
+│   │   │   │   │   ├── crypto/
+│   │   │   │   │   │   └── ...
+│   │   │   │   │   ├── identity/
+│   │   │   │   │   │   └── ...
+│   │   │   │   │   ├── models/   //  Tests *should not* be generated. You write tests for your *manually created* code.
+│   │   │   │   │   │    ├── com/
+│   │   │   │   │   │    │    ├── atproto/
+│   │   │   │   │   │    │    │    ├── repo/
+│   │   │   │   │   │    │    │    │   ├── CreateRecordRequestTest.java   // Example test
+│   │   │   │   │   │    │    │    │   └── ...
+│   │   │   │   │   │    │    │    └── ...
+│   │   │   │   │   │    │    └── ...
+│   │   │   │   │   │    └── app/
+│   │   │   │   │   │          └── ...
+│   │   │   │   │   ├── moderation/
+│   │   │   │   │   │    └── ModerationActionTest.java
+│   │   │   │   │   └── codegen/
+│   │   │   │   │        ├── LexiconParserTest.java
+│   │   │   │   │        ├── ModelGeneratorTest.java
+│   │   │   │   │        └── ClientGeneratorTest.java
+│   │   └── resources/
+│   │       └── lexicons/
+│   │            └── com/
+│   │                └── example/
+│   │                    └── test.json
+├── pom.xml
 ├── README.md
-└── LICENSE
+├── LICENSE
+└── docs/           // Javadoc and other documentation
+    ├── README.md
+    └── chats/
 ```
