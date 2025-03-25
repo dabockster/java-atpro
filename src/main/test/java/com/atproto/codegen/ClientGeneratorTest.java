@@ -1,4 +1,5 @@
 // src/main/test/java/com/atproto/codegen/ClientGeneratorTest.java
+
 package com.atproto.codegen;
 
 import static org.junit.jupiter.api.Assertions.*;
@@ -612,7 +613,7 @@ public class ClientGeneratorTest {
         // const constraint
         if (constValue != null) {
             assertTrue(generatedCode
-                    .contains("public static final String " + paramName.UPPER_CASE() + " = \"" + constValue + "\";"));
+                    .contains("public static final String " + paramName.toUpperCase() + " = \"" + constValue + "\";"));
         }
 
         // Regex pattern (using annotation value)
@@ -657,7 +658,6 @@ public class ClientGeneratorTest {
                 paramField.set(paramInstance, invalidValue); // Try set invalid value.
             });
         }
-
         // Test pattern violation
         if (pattern != null) {
             // Try setting invalid input.
@@ -666,7 +666,6 @@ public class ClientGeneratorTest {
                 paramField.set(paramInstance, "123"); // Try set invalid numerical value.
             });
         }
-
     }
 
     // Data Providers (Continued)
@@ -836,7 +835,6 @@ public class ClientGeneratorTest {
                 Optional.empty(), Optional.empty(), Optional.empty(), Optional.empty()));
         stringFormatParams.put("ipv6Param", new LexString(Optional.of("ipv6"),
                 Optional.empty(), Optional.empty(), Optional.empty(), Optional.empty()));
-
         argList.add(
                 Arguments.of(TestUtils.createLexiconWithParams("com.example.stringFormatParams", stringFormatParams),
                         "atUriParam", "com.atproto.syntax.AtUri"));
@@ -859,7 +857,6 @@ public class ClientGeneratorTest {
         argList.add(
                 Arguments.of(TestUtils.createLexiconWithParams("com.example.stringFormatParams", stringFormatParams),
                         "datetimeParam", "java.time.Instant"));
-
         argList.add(
                 Arguments.of(TestUtils.createLexiconWithParams("com.example.stringFormatParams", stringFormatParams),
                         "languageParam", "java.util.Locale"));
@@ -884,6 +881,7 @@ public class ClientGeneratorTest {
         argList.add(
                 Arguments.of(TestUtils.createLexiconWithParams("com.example.stringFormatParams", stringFormatParams),
                         "ipv6Param", "java.net.InetAddress")); // Assuming InetAddress for IPv6
+
         return argList.stream();
     }
 
@@ -897,4 +895,46 @@ public class ClientGeneratorTest {
                         "[a-zA-Z]+"));
     }
 
+    @ParameterizedTest
+    @MethodSource("provideLexiconsForNoOutput")
+    public void testNoOutputSchema(LexiconDoc lexiconDoc, String expectedReturnType) throws Exception {
+        ClientGenerator generator = new ClientGenerator();
+        String generatedCode = generator.generateClient(lexiconDoc);
+
+        // --- Compilation and Reflection to check return type ---
+        String className = lexiconDoc.getId().substring(lexiconDoc.getId().lastIndexOf('.') + 1) + "Client";
+        Class<?> generatedClientClass = TestUtils.InMemoryCompiler.compile("com.example." + className, generatedCode);
+        Object clientInstance = generatedClientClass.getDeclaredConstructor().newInstance();
+        // Inject mockXrpcClient
+        java.lang.reflect.Field xrpcClientField = generatedClientClass.getDeclaredField("xrpcClient");
+        xrpcClientField.setAccessible(true);
+        xrpcClientField.set(clientInstance, mockXrpcClient);
+
+        // Find the method and its return type. This assumes the method name is "main"
+        java.lang.reflect.Method method = null;
+        for (java.lang.reflect.Method m : generatedClientClass.getMethods()) {
+            if (m.getName().equals("main")) { // Or whatever the method name is in your generated code
+                method = m;
+                break;
+            }
+        }
+        assertNotNull(method, "Method 'main' not found in generated class");
+
+        String actualReturnType = method.getGenericReturnType().getTypeName()
+                .replace("java.util.concurrent.CompletableFuture", "AtpResponse"); // Simplify for testing
+        assertEquals(expectedReturnType, actualReturnType);
+
+        // Basic stub (no parameters in this case)
+        when(mockXrpcClient.sendQuery(anyString(), any(), any(), any()))
+                .thenReturn(new AtpResponse<>(null, Optional.empty()));
+
+    }
+
+    private static Stream<Arguments> provideLexiconsForNoOutput() {
+        return Stream.of(
+                Arguments.of(TestUtils.createLexiconQueryNoOutput(), "AtpResponse<Void>"),
+                Arguments.of(TestUtils.createLexiconProcedureNoOutput(), "AtpResponse<Void>")
+
+        );
+    }
 }

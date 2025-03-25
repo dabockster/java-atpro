@@ -1,4 +1,4 @@
-// src/test/java/com/atproto/codegen/TestUtils.java
+//src/test/java/com/atproto/codegen/TestUtils.java
 
 package com.atproto.codegen;
 
@@ -292,52 +292,138 @@ public class TestUtils {
                 return new ByteArrayInputStream(str.getBytes(StandardCharsets.UTF_8));
         }
 
+        public static LexiconDoc createLexiconWithStringConstraints() {
+                List<LexDefinition> defs = new ArrayList<>();
+                Map<String, LexPrimitive> params = new HashMap<>();
+
+                // String with maxLength
+                params.put("maxLengthString", new LexString(Optional.empty(), Optional.empty(), Optional.of(10),
+                                Optional.empty(), Optional.empty()));
+
+                // String with minLength
+                params.put("minLengthString", new LexString(Optional.empty(), Optional.empty(), Optional.empty(),
+                                Optional.of(5), Optional.empty()));
+
+                // String with const
+                params.put("constString", new LexString(Optional.empty(), Optional.empty(), Optional.empty(),
+                                Optional.empty(), Optional.of(List.of("constantValue"))));
+
+                // String with pattern
+                params.put("patternString", new LexString(Optional.empty(), Optional.of("[a-zA-Z]+"), Optional.empty(),
+                                Optional.empty(), Optional.empty()));
+                // String with enum
+
+                List<String> enumValues = Arrays.asList("value1", "value2", "value3");
+                params.put("enumString", new LexString(Optional.empty(), Optional.empty(), Optional.empty(),
+                                Optional.empty(), Optional.of(enumValues)));
+
+                LexXrpcParameters xrpcParams = new LexObject(Optional.of("params"), Optional.empty(), params,
+                                new ArrayList<>());
+                LexXrpcBody output = new LexXrpcBody("application/json", Optional.empty(), Optional.empty());
+                LexXrpcQuery query = new LexXrpcQuery(Optional.of(xrpcParams), Optional.empty(), Optional.empty(),
+                                Optional.of(output), new ArrayList<>());
+                defs.add(new LexDefinition("main", "query", query));
+
+                return new LexiconDoc(1, "com.example.stringConstraints", Optional.of(0), Optional.empty(),
+                                defs.stream().collect(java.util.stream.Collectors.toMap(LexDefinition::getId,
+                                                java.util.function.Function.identity())));
+        }
+
+        public static Stream<Arguments> provideLexiconsForStringConstraints() {
+                return Stream.of(
+                                Arguments.of(createLexiconWithStringConstraints(), "maxLengthString", "String", 10,
+                                                null, null,
+                                                null), // maxLength
+                                Arguments.of(createLexiconWithStringConstraints(), "minLengthString", "String", null, 5,
+                                                null,
+                                                null), // minLength
+                                Arguments.of(createLexiconWithStringConstraints(), "constString", "String", null, null,
+                                                "constantValue",
+                                                null), // const value
+                                Arguments.of(createLexiconWithStringConstraints(), "patternString", "String", null,
+                                                null, null,
+                                                "[a-zA-Z]+") // Regex pattern
+                // Arguments.of(createLexiconWithStringConstraints(), "enumString", "String",
+                // null, null, null,enumValues)
+                );
+        }
+
+        public static LexiconDoc createLexiconQueryNoOutput() {
+                List<LexDefinition> defs = new ArrayList<>();
+                LexXrpcQuery query = new LexXrpcQuery(Optional.empty(), Optional.empty(), Optional.empty(),
+                                Optional.empty(), new ArrayList<>());
+                defs.add(new LexDefinition("main", "query", query));
+                return new LexiconDoc(1, "com.example.NoOutputQuery", Optional.of(0), Optional.empty(),
+                                defs.stream().collect(java.util.stream.Collectors.toMap(LexDefinition::getId,
+                                                java.util.function.Function.identity())));
+
+        }
+
+        public static LexiconDoc createLexiconProcedureNoOutput() {
+                List<LexDefinition> defs = new ArrayList<>();
+                LexXrpcProcedure proc = new LexXrpcProcedure(Optional.empty(), Optional.empty(), Optional.empty(),
+                                new ArrayList<>());
+                defs.add(new LexDefinition("main", "procedure", proc));
+                return new LexiconDoc(1, "com.example.NoOutputProcedure", Optional.of(0), Optional.empty(),
+                                defs.stream().collect(java.util.stream.Collectors.toMap(LexDefinition::getId,
+                                                java.util.function.Function.identity())));
+
+        }
+
         public static class InMemoryCompiler {
                 private static final JavaCompiler compiler = ToolProvider.getSystemJavaCompiler();
 
-      public static Class compile(String className, String sourceCode)
-          throws URISyntaxException, ClassNotFoundException {
-        JavaFileManager fileManager = new ClassFileManager(compiler.getStandardFileManager(null, null, null));
+                public static Class<?> compile(String className, String sourceCode)
+                                throws URISyntaxException, ClassNotFoundException {
+                        // Use try-with-resources to ensure closure
+                        try (JavaFileManager fileManager = new ClassFileManager(
+                                        compiler.getStandardFileManager(null, null, null))) {
 
-        List&lt;JavaFileObject&gt; compilationUnits = List.of(
-            new SourceFileObject(className, sourceCode));
+                                List<JavaFileObject> compilationUnits = new ArrayList<>();
+                                compilationUnits.add(new SourceFileObject(className, sourceCode));
 
-        // Create a compilation task
-        JavaCompiler.CompilationTask task = compiler.getTask(
-            null,    //No writer, write to memory.
-            fileManager,
-            null,    // No diagnostics listener
-            null,    // No options
-            null,    // No classes to be processed (for annotation processing)
-            compilationUnits);
+                                // Create a compilation task
+                                JavaCompiler.CompilationTask task = compiler.getTask(
+                                                null, // No writer, write to memory.
+                                                fileManager,
+                                                null, // No diagnostics listener
+                                                null, // No options
+                                                null, // No classes to be processed (for annotation processing)
+                                                compilationUnits);
 
-        // Perform the compilation
-        boolean success = task.call();
+                                // Perform the compilation
+                                boolean success = task.call();
 
-          if (!success) {
-              //For proper error reporting, we need to collect the diagnostics.
-              DiagnosticCollector&lt;JavaFileObject&gt; diagnostics = new DiagnosticCollector&lt;&gt;();
-              JavaFileManager fileManager2 = new ClassFileManager(compiler.getStandardFileManager(diagnostics, null, null));
-               compiler.getTask(
-                      null,    //No writer, write to memory.
-                      fileManager2,
-                      diagnostics,
-                      null,    // No options
-                      null,    // No classes to be processed
-                      compilationUnits).call();  //Don't check success; we want to see the diagnostics in either case.
+                                if (!success) {
+                                        // For proper error reporting, we need to collect the diagnostics.
+                                        DiagnosticCollector<JavaFileObject> diagnostics = new DiagnosticCollector<>();
+                                        JavaFileManager fileManager2 = new ClassFileManager(
+                                                        compiler.getStandardFileManager(diagnostics, null, null));
+                                        compiler.getTask(
+                                                        null, // No writer, write to memory.
+                                                        fileManager2,
+                                                        diagnostics,
+                                                        null, // No options
+                                                        null, // No classes to be processed
+                                                        compilationUnits).call(); // Don't check success; we want to see
+                                                                                  // the diagnostics in either case.
 
-              StringBuilder errorMsg = new StringBuilder();
-              errorMsg.append("Compilation failed:\n");
-              for (Diagnostic&lt;? extends JavaFileObject&gt; diagnostic : diagnostics.getDiagnostics()) {
-                  errorMsg.append(diagnostic.toString()).append("\n");
+                                        StringBuilder errorMsg = new StringBuilder();
+                                        errorMsg.append("Compilation failed:\n");
+                                        for (Diagnostic<? extends JavaFileObject> diagnostic : diagnostics
+                                                        .getDiagnostics()) {
+                                                errorMsg.append(diagnostic.toString()).append("\n");
 
-              }
-              throw new RuntimeException(errorMsg.toString());
-          }
+                                        }
+                                        throw new RuntimeException(errorMsg.toString());
+                                }
 
-        // Load the compiled class
-        return fileManager.getClassLoader(null).loadClass(className);
-      }
+                                // Load the compiled class
+                                return fileManager.getClassLoader(null).loadClass(className);
+                        } catch (IOException e) {
+                                throw new RuntimeException("IOException during in-memory compilation", e);
+                        }
+                }
 
                 private static class SourceFileObject extends SimpleJavaFileObject {
                         private final String sourceCode;
@@ -371,9 +457,8 @@ public class TestUtils {
                         }
                 }
 
-                private static class ClassFileManager extends ForwardingJavaFileManager {
-                        private final Map String;
-                        ClassFileObject compiledClasses = new HashMap();
+                private static class ClassFileManager extends ForwardingJavaFileManager<JavaFileManager> {
+                        private final Map<String, ClassFileObject> compiledClasses = new HashMap<>();
 
                         ClassFileManager(JavaFileManager fileManager) {
                                 super(fileManager);
@@ -383,7 +468,7 @@ public class TestUtils {
                         public ClassLoader getClassLoader(Location location) {
                                 return new ClassLoader() {
                                         @Override
-                                        protected Class findClass(String name) throws ClassNotFoundException {
+                                        protected Class<?> findClass(String name) throws ClassNotFoundException {
                                                 ClassFileObject classFile = compiledClasses.get(name);
                                                 if (classFile == null) {
                                                         throw new ClassNotFoundException(name);
@@ -408,250 +493,5 @@ public class TestUtils {
                                 }
                         }
                 }
-
-                public static LexiconDoc createLexiconWithStringConstraints() {
-                        List<LexDefinition> defs = new ArrayList<>();
-                        Map<String, LexPrimitive> params = new HashMap<>();
-
-                        // String with maxLength
-                        params.put("maxLengthString", new LexString(Optional.empty(), Optional.empty(), Optional.of(10),
-                                        Optional.empty(), Optional.empty()));
-
-                        // String with minLength
-                        params.put("minLengthString",
-                                        new LexString(Optional.empty(), Optional.empty(), Optional.empty(),
-                                                        Optional.of(5), Optional.empty()));
-
-                        // String with const
-                        params.put("constString", new LexString(Optional.empty(), Optional.empty(), Optional.empty(),
-                                        Optional.empty(), Optional.of(List.of("constantValue"))));
-
-                        // String with pattern
-                        params.put("patternString",
-                                        new LexString(Optional.empty(), Optional.of("[a-zA-Z]+"), Optional.empty(),
-                                                        Optional.empty(), Optional.empty()));
-                        // String with enum
-
-                        List<String> enumValues = Arrays.asList("value1", "value2", "value3");
-                        params.put("enumString", new LexString(Optional.empty(), Optional.empty(), Optional.empty(),
-                                        Optional.empty(), Optional.of(enumValues)));
-
-                        LexXrpcParameters xrpcParams = new LexObject(Optional.of("params"), Optional.empty(), params,
-                                        new ArrayList<>());
-                        LexXrpcBody output = new LexXrpcBody("application/json", Optional.empty(), Optional.empty());
-                        LexXrpcQuery query = new LexXrpcQuery(Optional.of(xrpcParams), Optional.empty(),
-                                        Optional.empty(),
-                                        Optional.of(output), new ArrayList<>());
-                        defs.add(new LexDefinition("main", "query", query));
-
-                        return new LexiconDoc(1, "com.example.stringConstraints", Optional.of(0), Optional.empty(),
-                                        defs.stream().collect(java.util.stream.Collectors.toMap(LexDefinition::getId,
-                                                        java.util.function.Function.identity())));
-                }
-
-                public static Stream<Arguments> provideLexiconsForStringConstraints() {
-                        return Stream.of(
-                                        Arguments.of(createLexiconWithStringConstraints(), "maxLengthString", "String",
-                                                        10, null, null, null), // maxLength
-                                        Arguments.of(createLexiconWithStringConstraints(), "minLengthString", "String",
-                                                        null, 5, null, null), // minLength
-                                        Arguments.of(createLexiconWithStringConstraints(), "constString", "String",
-                                                        null, null, "constantValue", null), // const value
-                                        Arguments.of(createLexiconWithStringConstraints(), "patternString", "String",
-                                                        null, null, null, "[a-zA-Z]+") // Regex pattern
-                        // Arguments.of(createLexiconWithStringConstraints(), "enumString", "String",
-                        // null, null, null,enumValues)
-                        );
-                }
-
-                public static Stream<Arguments> provideLexiconsForAllParameterTypes() {
-                        List<Arguments> argList = new ArrayList<>();
-
-                        // Integer types
-                        Map<String, LexPrimitive> intParams = new HashMap<>();
-                        intParams.put("intParam",
-                                        new LexInteger(Optional.empty(), Optional.empty(), Optional.empty(),
-                                                        Optional.empty()));
-                        argList.add(Arguments.of(TestUtils.createLexiconWithParams("com.example.intParams", intParams),
-                                        "intParam",
-                                        "Integer"));
-
-                        // Number types (float/double) part of LexNumber
-                        Map<String, LexPrimitive> numberParams = new HashMap<>();
-                        numberParams.put("floatParam",
-                                        new LexNumber(Optional.empty(), Optional.empty(), Optional.empty(),
-                                                        Optional.empty()));
-                        argList.add(Arguments.of(
-                                        TestUtils.createLexiconWithParams("com.example.floatParams", numberParams),
-                                        "floatParam", "Float")); // Double, double
-
-                        // String types
-                        Map<String, LexPrimitive> stringParams = new HashMap<>();
-                        stringParams.put("stringParam",
-                                        new LexString(Optional.empty(), Optional.empty(), Optional.empty(),
-                                                        Optional.empty(), Optional.empty()));
-                        argList.add(Arguments.of(
-                                        TestUtils.createLexiconWithParams("com.example.stringParams", stringParams),
-                                        "stringParam", "String"));
-
-                        // Boolean types
-                        Map<String, LexPrimitive> boolParams = new HashMap<>();
-                        boolParams.put("boolParam", new LexBoolean(Optional.empty(), Optional.empty()));
-                        argList.add(Arguments.of(
-                                        TestUtils.createLexiconWithParams("com.example.boolParams", boolParams),
-                                        "boolParam",
-                                        "Boolean"));
-
-                        // Bytes type
-                        Map<String, LexPrimitive> bytesParams = new HashMap<>();
-                        bytesParams.put("bytesParam",
-                                        new LexBytes(Optional.empty(), Optional.empty(), Optional.empty(),
-                                                        Optional.empty()));
-                        argList.add(Arguments.of(
-                                        TestUtils.createLexiconWithParams("com.example.bytesParams", bytesParams),
-                                        "bytesParam", "byte[]"));
-
-                        // CidLink
-                        Map<String, LexPrimitive> cidLinkParams = new HashMap<>();
-                        cidLinkParams.put("cidLinkParam", new LexCidLink(Optional.empty(), Optional.empty()));
-                        argList.add(Arguments.of(
-                                        TestUtils.createLexiconWithParams("com.example.cidLinkParams", cidLinkParams),
-                                        "cidLinkParam", "com.atproto.common.Cid"));
-
-                        // Array of primitives
-                        Map<String, LexType> arrayParams = new HashMap<>();
-                        arrayParams.put("intArrayParam", new LexArray(
-                                        new LexInteger(Optional.empty(), Optional.empty(), Optional.empty(),
-                                                        Optional.empty()),
-                                        Optional.empty(), Optional.empty(), Optional.empty()));
-                        argList.add(Arguments.of(
-                                        TestUtils.createLexiconWithParams("com.example.arrayParams", arrayParams),
-                                        "intArrayParam", "java.util.List<Integer>"));
-
-                        // Unknown
-                        Map<String, LexPrimitive> unknownParams = new HashMap<>();
-                        unknownParams.put("unknownParam", new LexUnknown(Optional.empty()));
-                        argList.add(Arguments.of(
-                                        TestUtils.createLexiconWithParams("com.example.unknownParams", unknownParams),
-                                        "unknownParam", "java.util.Map<String, Object>"));
-
-                        // String Formats.
-                        Map<String, LexPrimitive> stringFormatParams = new HashMap<>();
-                        stringFormatParams.put("atUriParam", new LexString(Optional.of("at-uri"),
-                                        Optional.empty(), Optional.empty(), Optional.empty(), Optional.empty()));
-                        stringFormatParams.put("cidParam", new LexString(Optional.of("cid"),
-                                        Optional.empty(), Optional.empty(), Optional.empty(), Optional.empty()));
-                        stringFormatParams.put("didParam", new LexString(Optional.of("did"),
-                                        Optional.empty(), Optional.empty(), Optional.empty(), Optional.empty()));
-                        stringFormatParams.put("handleParam", new LexString(Optional.of("handle"),
-                                        Optional.empty(), Optional.empty(), Optional.empty(), Optional.empty()));
-                        stringFormatParams.put("nsidParam", new LexString(Optional.of("nsid"),
-                                        Optional.empty(), Optional.empty(), Optional.empty(), Optional.empty()));
-                        stringFormatParams.put("datetimeParam", new LexString(Optional.of("datetime"),
-                                        Optional.empty(), Optional.empty(), Optional.empty(), Optional.empty()));
-
-                        stringFormatParams.put("languageParam", new LexString(Optional.of("language"),
-                                        Optional.empty(), Optional.empty(), Optional.empty(), Optional.empty()));
-                        stringFormatParams.put("uriParam", new LexString(Optional.of("uri"),
-                                        Optional.empty(), Optional.empty(), Optional.empty(), Optional.empty()));
-                        stringFormatParams.put("uriRefParam", new LexString(Optional.of("uri-reference"),
-                                        Optional.empty(), Optional.empty(), Optional.empty(), Optional.empty()));
-                        stringFormatParams.put("uriTemplateParam", new LexString(Optional.of("uri-template"),
-                                        Optional.empty(), Optional.empty(), Optional.empty(), Optional.empty()));
-                        stringFormatParams.put("emailParam", new LexString(Optional.of("email"),
-                                        Optional.empty(), Optional.empty(), Optional.empty(), Optional.empty()));
-                        stringFormatParams.put("hostnameParam", new LexString(Optional.of("hostname"),
-                                        Optional.empty(), Optional.empty(), Optional.empty(), Optional.empty()));
-                        stringFormatParams.put("ipv4Param", new LexString(Optional.of("ipv4"),
-                                        Optional.empty(), Optional.empty(), Optional.empty(), Optional.empty()));
-                        stringFormatParams.put("ipv6Param", new LexString(Optional.of("ipv6"),
-                                        Optional.empty(), Optional.empty(), Optional.empty(), Optional.empty()));
-                        argList.add(
-                                        Arguments.of(TestUtils.createLexiconWithParams("com.example.stringFormatParams",
-                                                        stringFormatParams),
-                                                        "atUriParam", "com.atproto.syntax.AtUri"));
-                        argList.add(
-                                        Arguments.of(TestUtils.createLexiconWithParams("com.example.stringFormatParams",
-                                                        stringFormatParams),
-                                                        "cidParam", "com.atproto.common.Cid")); // Assuming you have a
-                                                                                                // Cid class.
-
-                        argList.add(
-                                        Arguments.of(TestUtils.createLexiconWithParams("com.example.stringFormatParams",
-                                                        stringFormatParams),
-                                                        "didParam", "com.atproto.syntax.Did")); // Assuming you have a
-                                                                                                // Did class
-
-                        argList.add(
-                                        Arguments.of(TestUtils.createLexiconWithParams("com.example.stringFormatParams",
-                                                        stringFormatParams),
-                                                        "handleParam", "com.atproto.syntax.Handle")); // Assuming you
-                                                                                                      // have a Handle
-                                                                                                      // class
-
-                        argList.add(
-                                        Arguments.of(TestUtils.createLexiconWithParams("com.example.stringFormatParams",
-                                                        stringFormatParams),
-                                                        "nsidParam", "com.atproto.syntax.Nsid")); // Assuming you have
-                                                                                                  // an NSID class.
-
-                        argList.add(
-                                        Arguments.of(TestUtils.createLexiconWithParams("com.example.stringFormatParams",
-                                                        stringFormatParams),
-                                                        "datetimeParam", "java.time.Instant"));
-                        argList.add(
-                                        Arguments.of(TestUtils.createLexiconWithParams("com.example.stringFormatParams",
-                                                        stringFormatParams),
-                                                        "languageParam", "java.util.Locale"));
-                        argList.add(
-                                        Arguments.of(TestUtils.createLexiconWithParams("com.example.stringFormatParams",
-                                                        stringFormatParams),
-                                                        "uriParam", "java.net.URI"));
-                        argList.add(
-                                        Arguments.of(TestUtils.createLexiconWithParams("com.example.stringFormatParams",
-                                                        stringFormatParams),
-                                                        "uriRefParam", "java.net.URI")); // Assuming URI for
-                                                                                         // uri-reference
-                        argList.add(
-                                        Arguments.of(TestUtils.createLexiconWithParams("com.example.stringFormatParams",
-                                                        stringFormatParams),
-                                                        "uriTemplateParam", "java.lang.String")); // Assuming String for
-                                                                                                  // uri-template (no
-                                                                                                  // built-in type)
-                        argList.add(
-                                        Arguments.of(TestUtils.createLexiconWithParams("com.example.stringFormatParams",
-                                                        stringFormatParams),
-                                                        "emailParam", "java.lang.String")); // Assuming String for email
-                        argList.add(
-                                        Arguments.of(TestUtils.createLexiconWithParams("com.example.stringFormatParams",
-                                                        stringFormatParams),
-                                                        "hostnameParam", "java.lang.String")); // Assuming String for
-                                                                                               // hostname
-                        argList.add(
-                                        Arguments.of(TestUtils.createLexiconWithParams("com.example.stringFormatParams",
-                                                        stringFormatParams),
-                                                        "ipv4Param", "java.net.InetAddress")); // Assuming InetAddress
-                                                                                               // for IPv4
-                        argList.add(
-                                        Arguments.of(TestUtils.createLexiconWithParams("com.example.stringFormatParams",
-                                                        stringFormatParams),
-                                                        "ipv6Param", "java.net.InetAddress")); // Assuming InetAddress
-                                                                                               // for IPv6
-
-                        return argList.stream();
-                }
-
-                private static Stream<Arguments> provideLexiconsForInvalidLexicons() {
-                        return Stream.of(
-                                        // Missing 'defs'
-                                        Arguments.of(TestUtils.createLexiconWithoutDefs(),
-                                                        IllegalArgumentException.class),
-                                        // Invalid type within parameters
-                                        Arguments.of(TestUtils.createLexiconWithInvalidType(),
-                                                        IllegalArgumentException.class)
-
-                        );
-                }
-
         }
 }
