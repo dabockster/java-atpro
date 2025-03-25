@@ -54,10 +54,10 @@ public class ClientGeneratorTest {
         assertTrue(generatedCode.contains("public class SimpleQueryClient"));
         assertTrue(generatedCode.contains("public AtpResponse"));
         assertTrue(generatedCode.contains("simpleQuery("));
-        assertTrue(generatedCode.contains(
-                "xrpcClient.sendQuery"));
-        assertFalse(generatedCode.contains(
-                "import com.atproto.api.xrpc.XRPCException;"));
+        assertTrue(generatedCode.contains("xrpcClient.sendQuery"));
+        assertFalse(
+                generatedCode.contains("import com.atproto.api.xrpc.XRPCException;")); // No params, no
+        // XRPCException import
 
         // --- Compilation and Reflection ---
         Class<?> generatedClientClass = TestUtils.InMemoryCompiler.compile("com.example.SimpleQueryClient",
@@ -76,11 +76,11 @@ public class ClientGeneratorTest {
         java.lang.reflect.Method method = generatedClientClass.getMethod("simpleQuery");
         Object result = method.invoke(clientInstance);
         assertInstanceOf(AtpResponse.class, result);
-
     }
 
     @Test
-    public void testGenerateClientForQueryWithParams() throws Exception { // Added Exception
+    public void testGenerateClientForQueryWithParams()
+            throws Exception { // Added Exception
         // Test params Client
         LexiconDoc lexiconDoc = TestUtils.createQueryWithParamsLexicon(); // Create Lexicon
         ClientGenerator generator = new ClientGenerator(); // ClientGenerator instance
@@ -90,8 +90,9 @@ public class ClientGeneratorTest {
         assertTrue(generatedCode.contains("package com.example;")); // Package name
         assertTrue(generatedCode.contains("public class ParamsQueryClient")); // Class Name.
         assertTrue(generatedCode.contains("public AtpResponse")); // Returns AtpResponse
-        assertTrue(generatedCode.contains(
-                "paramsQuery(ParamsQueryParams params")); // Query method with parameters and type
+        assertTrue(
+                generatedCode.contains(
+                        "paramsQuery(ParamsQueryParams params")); // Query method with parameters and type
         assertTrue(generatedCode.contains("xrpcClient.sendQuery")); // Use XRPC
 
         // --- Compilation and Reflection ---
@@ -114,7 +115,6 @@ public class ClientGeneratorTest {
         java.lang.reflect.Method method = generatedClientClass.getMethod("paramsQuery", paramClass);
         Object result = method.invoke(clientInstance, paramInstance); // Pass the parameter instance
         assertInstanceOf(AtpResponse.class, result);
-
     }
 
     @Test
@@ -128,9 +128,12 @@ public class ClientGeneratorTest {
         assertTrue(generatedCode.contains("package com.example;")); // Package name
         assertTrue(generatedCode.contains("public class ProcedureClient")); // Class name
         assertTrue(generatedCode.contains("public AtpResponse")); // Return AtpResponse
-        assertTrue(generatedCode.contains("procedure(ProcedureProcedureInput input")); // Proper params
-        assertTrue(generatedCode.contains(
-                "xrpcClient.sendProcedure")); // Check for XRPC call (should be checked in its own test)
+        assertTrue(
+                generatedCode.contains(
+                        "procedure(ProcedureProcedureInput input")); // Proper params
+        assertTrue(
+                generatedCode.contains(
+                        "xrpcClient.sendProcedure")); // Check for XRPC call (should be checked in its own test)
 
         // --- Compilation and Reflection ---
         Class<?> generatedClientClass = TestUtils.InMemoryCompiler.compile("com.example.ProcedureClient",
@@ -150,7 +153,7 @@ public class ClientGeneratorTest {
 
         // Execute and test
         java.lang.reflect.Method method = generatedClientClass.getMethod("procedure", inputClass); // Get method
-                                                                                                   // signature
+        // signature
         Object result = method.invoke(clientInstance, inputInstance); // Invoke with parameter
         assertInstanceOf(AtpResponse.class, result);
     }
@@ -164,16 +167,19 @@ public class ClientGeneratorTest {
 
         // Basic checks (subscriptions might have a very different structure)
         assertTrue(generatedCode.contains("package com.example;")); // Package name
-        assertTrue(generatedCode.contains(
-                "public class SubscriptionClient")); // Class exists (name should automatically be generated from the
-                                                     // name)
+        assertTrue(
+                generatedCode.contains(
+                        "public class SubscriptionClient")); // Class exists (name should automatically be generated
+                                                             // from the
+        // name)
         assertTrue(generatedCode.contains("public void")); // void return type.
         assertTrue(
-                generatedCode.contains("subscription(")); // Subscription Method. (name should automatically be
-                                                          // generated
+                generatedCode.contains(
+                        "subscription(")); // Subscription Method. (name should automatically be generated
         // from the name)
-        assertTrue(generatedCode.contains(
-                "throw new UnsupportedOperationException")); // Subscription not implemented
+        assertTrue(
+                generatedCode.contains(
+                        "throw new UnsupportedOperationException")); // Subscription not implemented
     }
 
     @Test
@@ -198,7 +204,6 @@ public class ClientGeneratorTest {
 
         // Check for multiple methods
         assertEquals(1, countOccurrences(generatedCode, "queryMethod")); // Query exists
-
     }
 
     // Helper Method. (Need to find something more formal; maybe write one of my
@@ -235,28 +240,32 @@ public class ClientGeneratorTest {
         xrpcClientField.set(clientInstance, mockXrpcClient);
 
         // Stub the mock to throw the exception
-        when(mockXrpcClient.sendQuery(anyString(), any(), any(), any())).thenThrow(new XRPCException(null, null));
+        when(mockXrpcClient.sendQuery(anyString(), any(), any(), any()))
+                .thenThrow(new XRPCException(null, null));
 
         java.lang.reflect.Method method = generatedClientClass.getMethod("simpleQuery");
 
         // Assert that the method call throws the expected exception
-        assertThrows(XRPCException.class, () -> {
-            method.invoke(clientInstance);
-        });
+        assertThrows(
+                XRPCException.class,
+                () -> {
+                    method.invoke(clientInstance);
+                });
     }
 
     // Test that AtpResponse gets imported.
     @Test
     public void testAtpResponseType() throws IOException {
         LexiconDoc lexiconDoc = TestUtils.createSimpleQueryLexicon(); // Create Lexicon. (doesn't really matter which
-                                                                      // Lexicon
+        // Lexicon
         // we make, just need one)
 
         ClientGenerator generator = new ClientGenerator(); // ClientGenerator instance
         String generatedCode = generator.generateClient(lexiconDoc); // Generate
 
-        assertTrue(generatedCode.contains(
-                "import com.atproto.api.AtpResponse;")); // Should import AtpResponse
+        assertTrue(
+                generatedCode.contains(
+                        "import com.atproto.api.AtpResponse;")); // Should import AtpResponse
     }
 
     // Helper methods for creating Lexicon structures (for test readability)
@@ -264,7 +273,8 @@ public class ClientGeneratorTest {
 
     @ParameterizedTest
     @MethodSource("provideLexiconsForAllParameterTypes")
-    public void testGenerateClientForVariousParameterTypes(LexiconDoc lexiconDoc, String paramName, String expectedType)
+    public void testGenerateClientForVariousParameterTypes(
+            LexiconDoc lexiconDoc, String paramName, String expectedType)
             throws Exception { // Added Exception
         ClientGenerator generator = new ClientGenerator();
         String generatedCode = generator.generateClient(lexiconDoc);
@@ -311,7 +321,8 @@ public class ClientGeneratorTest {
         } else if (lexiconDoc.getDefs().get("main") instanceof LexXrpcProcedure) {
             LexXrpcProcedure procedure = (LexXrpcProcedure) lexiconDoc.getDefs().get("main");
             if (procedure.getOutput().isPresent() && procedure.getOutput().get().getSchema().isPresent()) {
-                expectedReturnType = "AtpResponse<" + getExpectedJavaType((LexXrpcBody) procedure.getOutput().get())
+                expectedReturnType = "AtpResponse<"
+                        + getExpectedJavaType((LexXrpcBody) procedure.getOutput().get())
                         + ">";
 
             } else {
@@ -323,7 +334,9 @@ public class ClientGeneratorTest {
 
         // Now we assert that the return type from code gen is as expected
         String actualReturnType = method.getGenericReturnType().getTypeName()
-                .replace("java.util.concurrent.CompletableFuture", "AtpResponse"); // Simplify for testing
+                .replace(
+                        "java.util.concurrent.CompletableFuture",
+                        "AtpResponse"); // Simplify for testing
         assertEquals(expectedReturnType, actualReturnType);
 
         // Stub Mockito for the method call (added)
@@ -334,7 +347,6 @@ public class ClientGeneratorTest {
             when(mockXrpcClient.sendQuery(anyString(), any(), any(), any()))
                     .thenReturn(new AtpResponse<>(null, Optional.empty()));
         }
-
     }
 
     // Helper function to return expected Java type String from Lexicon definition.
@@ -396,7 +408,6 @@ public class ClientGeneratorTest {
                     return "java.net.InetAddress"; // Assuming InetAddress for IPv4
                 } else if (lexString.getFormat().get().equals("ipv6")) {
                     return "java.net.InetAddress"; // Assuming InetAddress for IPv6
-
                 }
             }
             return "String";
@@ -462,8 +473,9 @@ public class ClientGeneratorTest {
         assertTrue(generatedCode.contains("package com.example;")); // Package name
         assertTrue(generatedCode.contains("public class NestedObjectClient")); // Class Name.
         assertTrue(generatedCode.contains("public AtpResponse")); // Returns AtpResponse
-        assertTrue(generatedCode.contains(
-                "nestedObject(")); // Query method with parameters and type
+        assertTrue(
+                generatedCode.contains(
+                        "nestedObject(")); // Query method with parameters and type
 
         // --- Compilation and Reflection, as before, BUT: ---
         // 1. Compile and Get Class:
@@ -491,7 +503,8 @@ public class ClientGeneratorTest {
 
     @ParameterizedTest
     @MethodSource("provideLexiconsForInvalidLexicons")
-    public void testInvalidLexiconStructure(LexiconDoc lexiconDoc, Class<? extends Exception> expectedException) {
+    public void testInvalidLexiconStructure(
+            LexiconDoc lexiconDoc, Class<? extends Exception> expectedException) {
         ClientGenerator generator = new ClientGenerator();
         assertThrows(expectedException, () -> generator.generateClient(lexiconDoc));
     }
@@ -504,13 +517,12 @@ public class ClientGeneratorTest {
         assertTrue(generatedCode.contains("class Query1Client"));
         assertTrue(generatedCode.contains("class Query2Client"));
         assertTrue(generatedCode.contains("class Record1Record")); // Check for records.
-
     }
 
     @ParameterizedTest // Enhanced to be parameterized
     @MethodSource("provideLexiconsForRefUnionParams")
-    public void testGenerateClientForRefUnionParams(LexiconDoc lexiconDoc, String methodName, String expectedParamType)
-            throws Exception {
+    public void testGenerateClientForRefUnionParams(
+            LexiconDoc lexiconDoc, String methodName, String expectedParamType) throws Exception {
         ClientGenerator generator = new ClientGenerator();
         String generatedCode = generator.generateClient(lexiconDoc);
 
@@ -520,7 +532,9 @@ public class ClientGeneratorTest {
         assertTrue(generatedCode.contains("public class " + className));
 
         // Dynamic method name check
-        assertTrue(generatedCode.contains("public AtpResponse " + methodName + "(" + expectedParamType + " params)"));
+        assertTrue(
+                generatedCode.contains(
+                        "public AtpResponse " + methodName + "(" + expectedParamType + " params)"));
 
         // --- Compilation, Reflection, and Mockito Stubbing ---
         Class<?> generatedClientClass = TestUtils.InMemoryCompiler.compile("com.example." + className, generatedCode);
@@ -536,7 +550,6 @@ public class ClientGeneratorTest {
         // Basic stubbing (you'd expand this for specific test cases)
         when(mockXrpcClient.sendQuery(anyString(), any(), any(), any()))
                 .thenReturn(new AtpResponse<>(null, Optional.empty()));
-
     }
 
     @Test
@@ -552,18 +565,25 @@ public class ClientGeneratorTest {
         assertTrue(generatedCode.contains("public class SimpleQueryClientWithDescription"));
 
         // Compile and load the class, then verify with reflection
-        Class<?> generatedClientClass = TestUtils.InMemoryCompiler
-                .compile("com.example.SimpleQueryClientWithDescription", generatedCode);
+        Class<?> generatedClientClass = TestUtils.InMemoryCompiler.compile(
+                "com.example.SimpleQueryClientWithDescription", generatedCode);
         java.lang.reflect.Method method = generatedClientClass.getMethod("simpleQuery");
-        assertNotNull(method.getAnnotations(), "Method should have annotations"); // A very basic check. Could be more
-                                                                                  // thorough.
-
+        assertNotNull(
+                method.getAnnotations(), "Method should have annotations"); // A very basic check. Could be more
+        // thorough.
     }
 
     @ParameterizedTest
     @MethodSource("provideLexiconsForStringConstraints")
-    public void testStringConstraints(LexiconDoc lexiconDoc, String paramName, String expectedType,
-            Integer maxLength, Integer minLength, String constValue, String pattern) throws Exception {
+    public void testStringConstraints(
+            LexiconDoc lexiconDoc,
+            String paramName,
+            String expectedType,
+            Integer maxLength,
+            Integer minLength,
+            String constValue,
+            String pattern)
+            throws Exception {
         ClientGenerator generator = new ClientGenerator();
         String generatedCode = generator.generateClient(lexiconDoc);
 
@@ -598,22 +618,27 @@ public class ClientGeneratorTest {
         if (maxLength != null) {
             Annotation maxLengthAnnotation = paramField.getAnnotation(MaxLength.class);
             assertNotNull(maxLengthAnnotation, "MaxLength annotation not found");
-            assertEquals(maxLength.intValue(), ((MaxLength) maxLengthAnnotation).value(),
-                    "MaxLength value mismatch");
+            assertEquals(
+                    maxLength.intValue(), ((MaxLength) maxLengthAnnotation).value(), "MaxLength value mismatch");
         }
 
         // minLength constraint
         if (minLength != null) {
             Annotation minLengthAnnotation = paramField.getAnnotation(MinLength.class);
             assertNotNull(minLengthAnnotation, "MinLength annotation not found");
-            assertEquals(minLength.intValue(), ((MinLength) minLengthAnnotation).value(),
-                    "MinLength value mismatch");
+            assertEquals(
+                    minLength.intValue(), ((MinLength) minLengthAnnotation).value(), "MinLength value mismatch");
         }
 
         // const constraint
         if (constValue != null) {
-            assertTrue(generatedCode
-                    .contains("public static final String " + paramName.toUpperCase() + " = \"" + constValue + "\";"));
+            assertTrue(
+                    generatedCode.contains(
+                            "public static final String "
+                                    + paramName.toUpperCase()
+                                    + " = \""
+                                    + constValue
+                                    + "\";"));
         }
 
         // Regex pattern (using annotation value)
@@ -629,20 +654,23 @@ public class ClientGeneratorTest {
         // Test maxLength violation
         if (maxLength != null) {
             String longString = "a".repeat(maxLength + 1);
-            assertThrows(ConstraintViolationException.class, () -> {
-                paramField.setAccessible(true); // Make it accessible.
-                paramField.set(paramInstance, longString); // Set the parameter, throw if invalid.
-            });
-
+            assertThrows(
+                    ConstraintViolationException.class,
+                    () -> {
+                        paramField.setAccessible(true); // Make it accessible.
+                        paramField.set(paramInstance, longString); // Set the parameter, throw if invalid.
+                    });
         }
 
         // Test minLength violation
         if (minLength != null) {
             String shortString = "a".repeat(minLength - 1);
-            assertThrows(ConstraintViolationException.class, () -> {
-                paramField.setAccessible(true); // Make it accessible.
-                paramField.set(paramInstance, shortString); // Set the parameter, throw if invalid.
-            });
+            assertThrows(
+                    ConstraintViolationException.class,
+                    () -> {
+                        paramField.setAccessible(true); // Make it accessible.
+                        paramField.set(paramInstance, shortString); // Set the parameter, throw if invalid.
+                    });
         }
 
         // Test const violation (we set to the valid, and then an invalid value)
@@ -653,18 +681,22 @@ public class ClientGeneratorTest {
             paramField.set(paramInstance, validValue); // Set GOOD.
             String invalidValue = validValue + "_INVALID";
 
-            assertThrows(ConstraintViolationException.class, () -> {
-                paramField.setAccessible(true); // Make it accessible.
-                paramField.set(paramInstance, invalidValue); // Try set invalid value.
-            });
+            assertThrows(
+                    ConstraintViolationException.class,
+                    () -> {
+                        paramField.setAccessible(true); // Make it accessible.
+                        paramField.set(paramInstance, invalidValue); // Try set invalid value.
+                    });
         }
         // Test pattern violation
         if (pattern != null) {
             // Try setting invalid input.
-            assertThrows(ConstraintViolationException.class, () -> {
-                paramField.setAccessible(true); // Make it accessible.
-                paramField.set(paramInstance, "123"); // Try set invalid numerical value.
-            });
+            assertThrows(
+                    ConstraintViolationException.class,
+                    () -> {
+                        paramField.setAccessible(true); // Make it accessible.
+                        paramField.set(paramInstance, "123"); // Try set invalid numerical value.
+                    });
         }
     }
 
@@ -674,19 +706,23 @@ public class ClientGeneratorTest {
     // and expected Parameter Type.
     private static Stream<Arguments> provideLexiconsForRefUnionParams() {
         return Stream.of(
-                Arguments.of(TestUtils.createLexiconWithRefUnionParams(), "refUnionParams", "java.lang.Object") // Object
-                                                                                                                // for
-                                                                                                                // now,
-                                                                                                                // may
-                                                                                                                // be
-                                                                                                                // refined
+                Arguments.of(
+                        TestUtils.createLexiconWithRefUnionParams(),
+                        "refUnionParams",
+                        "java.lang.Object") // Object
+        // for
+        // now,
+        // may
+        // be
+        // refined
         );
     }
 
     // Added Invalid Lex Version Test
     @ParameterizedTest
     @MethodSource("provideLexiconsForInvalidLexVersions")
-    public void testInvalidLexiconVersion(LexiconDoc lexiconDoc, Class<? extends Exception> expectedException) {
+    public void testInvalidLexiconVersion(
+            LexiconDoc lexiconDoc, Class<? extends Exception> expectedException) {
         ClientGenerator generator = new ClientGenerator();
         assertThrows(expectedException, () -> generator.generateClient(lexiconDoc)); // Expect an exception
     }
@@ -718,8 +754,7 @@ public class ClientGeneratorTest {
 
         // --- Compilation and Reflection ---
         String className = lexiconDoc.getId().substring(lexiconDoc.getId().lastIndexOf('.') + 1) + "Client";
-        Class<?> generatedClientClass = TestUtils.InMemoryCompiler.compile("com.example." + className,
-                generatedCode);
+        Class<?> generatedClientClass = TestUtils.InMemoryCompiler.compile("com.example." + className, generatedCode);
         Object clientInstance = generatedClientClass.getDeclaredConstructor().newInstance();
 
         // Inject mockXrpcClient
@@ -729,23 +764,32 @@ public class ClientGeneratorTest {
 
         when(mockXrpcClient.sendQuery(anyString(), any(), any(), any()))
                 .thenReturn(new AtpResponse<>(null, Optional.empty()));
-
     }
 
     private static Stream<Arguments> provideLexiconsForValidLexVersions() {
         List<LexDefinition> defs = new ArrayList<>();
         LexXrpcBody output = new LexXrpcBody("application/json", Optional.empty(), Optional.empty());
-        LexXrpcQuery query = new LexXrpcQuery(Optional.empty(), Optional.of("This is a test query."), Optional.empty(),
-                Optional.of(output), new ArrayList<>()); // Added description
+        LexXrpcQuery query = new LexXrpcQuery(
+                Optional.empty(),
+                Optional.of("This is a test query."),
+                Optional.empty(),
+                Optional.of(output),
+                new ArrayList<>()); // Added description
         defs.add(new LexDefinition("main", "query", query));
 
         return Stream.of(
                 // lex value of 1
-                Arguments.of(new LexiconDoc(1, "com.example.validversion", Optional.of(0), Optional.empty(),
-                        defs.stream().collect(java.util.stream.Collectors.toMap(LexDefinition::getId,
-                                java.util.function.Function.identity()))))
-
-        );
+                Arguments.of(
+                        new LexiconDoc(
+                                1,
+                                "com.example.validversion",
+                                Optional.of(0),
+                                Optional.empty(),
+                                defs.stream()
+                                        .collect(
+                                                java.util.stream.Collectors.toMap(
+                                                        LexDefinition::getId,
+                                                        java.util.function.Function.identity())))));
     }
 
     private static Stream<Arguments> provideLexiconsForAllParameterTypes() {
@@ -885,16 +929,6 @@ public class ClientGeneratorTest {
         return argList.stream();
     }
 
-    private static Stream<Arguments> provideLexiconsForStringConstraints() {
-        return Stream.of(
-                Arguments.of(createLexiconWithStringConstraints(), "maxLengthString", "String", 10, null, null, null),
-                Arguments.of(createLexiconWithStringConstraints(), "minLengthString", "String", null, 5, null, null),
-                Arguments.of(createLexiconWithStringConstraints(), "constString", "String", null, null, "constantValue",
-                        null),
-                Arguments.of(createLexiconWithStringConstraints(), "patternString", "String", null, null, null,
-                        "[a-zA-Z]+"));
-    }
-
     @ParameterizedTest
     @MethodSource("provideLexiconsForNoOutput")
     public void testNoOutputSchema(LexiconDoc lexiconDoc, String expectedReturnType) throws Exception {
@@ -937,4 +971,35 @@ public class ClientGeneratorTest {
 
         );
     }
+
+    // Parameterized test for invalid Lexicon structures
+    @ParameterizedTest
+    @MethodSource("provideInvalidLexicons")
+    public void testInvalidLexiconStructure(
+            LexiconDoc lexiconDoc, Class<? extends Exception> expectedException) {
+        ClientGenerator generator = new ClientGenerator();
+        assertThrows(expectedException, () -> generator.generateClient(lexiconDoc));
+    }
+
+    private static Stream<Arguments> provideInvalidLexicons() {
+        return Stream.of(
+                Arguments.of(
+                        TestUtils.createLexiconWithoutDefs(),
+                        IllegalArgumentException.class), // Or a custom exception type
+                Arguments.of(
+                        TestUtils.createLexiconWithInvalidIdFormat(),
+                        IllegalArgumentException.class), // Or a custom exception type
+                Arguments.of(
+                        TestUtils.createLexiconWithConflictingDefinitions(),
+                        IllegalArgumentException.class), // Or a custom exception type.
+                Arguments.of(TestUtils.createLexiconWithInvalidArrayDefinition_Nested(),
+                        IllegalArgumentException.class),
+                Arguments.of(TestUtils.createLexiconWithInvalidArrayDefinition_MissingItems(),
+                        NullPointerException.class),
+                Arguments.of(TestUtils.createLexiconWithInvalidRefTarget(), IllegalArgumentException.class),
+                Arguments.of(TestUtils.createLexiconWithInvalidRefUnionTarget(), IllegalArgumentException.class),
+                Arguments.of(TestUtils.createLexiconWithInvalidStringFormat(), IllegalArgumentException.class),
+                Arguments.of(TestUtils.createLexiconWithInvalidType(), IllegalArgumentException.class));
+    }
+
 }
