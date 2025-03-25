@@ -1,3 +1,5 @@
+// src/test/java/com/atproto/codegen/TestUtils.java
+
 package com.atproto.codegen;
 
 import com.atproto.lexicon.models.*;
@@ -33,7 +35,7 @@ public class TestUtils {
         List<LexDefinition> defs = new ArrayList<>();
         LexXrpcBody output = new LexXrpcBody("application/json", Optional.empty(), Optional.empty());
         LexXrpcQuery query = new LexXrpcQuery(Optional.empty(), Optional.of("This is a test query."), Optional.empty(),
-                Optional.of(output), new ArrayList<>());
+                Optional.of(output), new ArrayList<>()); // Added description
         defs.add(new LexDefinition("main", "query", query));
         return new LexiconDoc(1, "com.example.simpleQueryWithDescription", Optional.of(0), Optional.empty(),
                 defs.stream().collect(java.util.stream.Collectors.toMap(LexDefinition::getId,
@@ -174,8 +176,10 @@ public class TestUtils {
         LexXrpcQuery query = new LexXrpcQuery(Optional.of(xrpcParams), Optional.empty(), Optional.empty(),
                 Optional.of(output), new ArrayList<>());
         defs.add(new LexDefinition("main", "query", query));
-        return new LexiconDoc(1, id, Optional.of(0), Optional.empty(), defs.stream().collect(
-                java.util.stream.Collectors.toMap(LexDefinition::getId, java.util.function.Function.identity())));
+        LexiconDoc doc = new LexiconDoc(1, id, Optional.of(0), Optional.empty(),
+                defs.stream().collect(java.util.stream.Collectors.toMap(LexDefinition::getId,
+                        java.util.function.Function.identity())));
+        return doc;
     }
 
     public static LexiconDoc createLexiconWithRefUnionParams() {
@@ -270,6 +274,43 @@ public class TestUtils {
         defs.add(new LexDefinition("main", "query", query)); //
 
         return new LexiconDoc(1, "com.example.invalidType", Optional.of(0), Optional.empty(),
+                defs.stream().collect(java.util.stream.Collectors.toMap(LexDefinition::getId,
+                        java.util.function.Function.identity())));
+    }
+
+    public static LexiconDoc createStringConstraintsLexicon() {
+        List<LexDefinition> defs = new ArrayList<>();
+        Map<String, LexPrimitive> params = new HashMap<>();
+
+        // String with maxLength
+        params.put("maxLengthString",
+                new LexString(Optional.empty(), Optional.empty(), Optional.of(10), Optional.empty(), Optional.empty()));
+
+        // String with minLength
+        params.put("minLengthString",
+                new LexString(Optional.empty(), Optional.empty(), Optional.empty(), Optional.of(5), Optional.empty()));
+
+        // String with const
+        params.put("constString", new LexString(Optional.empty(), Optional.empty(), Optional.empty(), Optional.empty(),
+                Optional.of("constantValue")));
+
+        // String with pattern (regex)
+        params.put("patternString", new LexString(Optional.empty(), Optional.of("[a-zA-Z]+"), Optional.empty(),
+                Optional.empty(), Optional.empty())); // Only letters
+
+        // String with enum
+        List<String> enumValues = Arrays.asList("value1", "value2", "value3");
+        params.put("enumString", new LexString(Optional.empty(), Optional.empty(), Optional.empty(), Optional.empty(),
+                Optional.of(enumValues)));
+
+        LexXrpcParameters xrpcParams = new LexObject(Optional.of("params"), Optional.empty(), params,
+                new ArrayList<>());
+        LexXrpcBody output = new LexXrpcBody("application/json", Optional.empty(), Optional.empty());
+        LexXrpcQuery query = new LexXrpcQuery(Optional.of(xrpcParams), Optional.empty(), Optional.empty(),
+                Optional.of(output), new ArrayList<>());
+        defs.add(new LexDefinition("main", "query", query));
+
+        return new LexiconDoc(1, "com.example.stringConstraints", Optional.of(0), Optional.empty(),
                 defs.stream().collect(java.util.stream.Collectors.toMap(LexDefinition::getId,
                         java.util.function.Function.identity())));
     }

@@ -46,13 +46,14 @@ public class ClientGeneratorTest {
         ClientGenerator generator = new ClientGenerator(); // ClientGenerator instance
         String generatedCode = generator.generateClient(lexiconDoc); // Generate
 
-        // Basic checks
+        // Basic checks (These are very basic. It should use a Java parser for real
+        // validation)
         assertTrue(generatedCode.contains("package com.example;")); // Package name
         assertTrue(generatedCode.contains("public class SimpleQueryClient")); // Has class name
         assertTrue(generatedCode.contains("public AtpResponse")); // Returns AtpResponse
         assertTrue(generatedCode.contains("simpleQuery(")); // Method name (same as ID)
         assertTrue(generatedCode.contains(
-                "xrpcClient.sendQuery")); // Use XRPC.
+                "xrpcClient.sendQuery")); // Use XRPC. (should we mock for this kind of test?)
         assertFalse(generatedCode.contains(
                 "import com.atproto.api.xrpc.XRPCException;")); // Doesn't import XRPC
 
@@ -83,8 +84,8 @@ public class ClientGeneratorTest {
         assertTrue(generatedCode.contains("package com.example;")); // Package name
         assertTrue(generatedCode.contains("public class ParamsQueryClient")); // Class Name.
         assertTrue(generatedCode.contains("public AtpResponse")); // Returns AtpResponse
-        assertTrue(generatedCode.contains("paramsQuery(ParamsQueryParams params")); // Query method with parameters and
-                                                                                    // type
+        assertTrue(generatedCode.contains(
+                "paramsQuery(ParamsQueryParams params")); // Query method with parameters and type
         assertTrue(generatedCode.contains("xrpcClient.sendQuery")); // Use XRPC
 
         // --- Compilation and Reflection ---
@@ -462,7 +463,7 @@ public class ClientGeneratorTest {
         numberParams.put("floatParam",
                 new LexNumber(Optional.empty(), Optional.empty(), Optional.empty(), Optional.empty()));
         argList.add(Arguments.of(TestUtils.createLexiconWithParams("com.example.floatParams", numberParams),
-                "floatParam", "Float")); // Double, double
+                "floatParam", "Float"));
 
         // String types
         Map<String, LexPrimitive> stringParams = new HashMap<>();
@@ -503,7 +504,8 @@ public class ClientGeneratorTest {
         unknownParams.put("unknownParam", new LexUnknown(Optional.empty()));
         argList.add(Arguments.of(TestUtils.createLexiconWithParams("com.example.unknownParams", unknownParams),
                 "unknownParam", "java.util.Map<String, Object>"));
-        // String Formats.
+
+        // String Formats (Existing).
         Map<String, LexPrimitive> stringFormatParams = new HashMap<>();
         stringFormatParams.put("atUriParam", new LexString(Optional.of("at-uri"), Optional.empty(), Optional.empty(),
                 Optional.empty(), Optional.empty()));
@@ -512,32 +514,46 @@ public class ClientGeneratorTest {
         stringFormatParams.put("didParam", new LexString(Optional.of("did"), Optional.empty(), Optional.empty(),
                 Optional.empty(), Optional.empty()));
         stringFormatParams.put("handleParam", new LexString(Optional.of("handle"), Optional.empty(), Optional.empty(),
-                Optional.empty, Optional.empty()));
+                Optional.empty(), Optional.empty()));
         stringFormatParams.put("nsidParam", new LexString(Optional.of("nsid"), Optional.empty(), Optional.empty(),
                 Optional.empty(), Optional.empty()));
         stringFormatParams.put("datetimeParam", new LexString(Optional.of("datetime"), Optional.empty(),
                 Optional.empty(), Optional.empty(), Optional.empty()));
         stringFormatParams.put("languageParam", new LexString(Optional.of("language"), Optional.empty(),
                 Optional.empty(), Optional.empty(), Optional.empty()));
+        stringFormatParams.put("uriParam", new LexString(Optional.of("uri"), Optional.empty(), Optional.empty(),
+                Optional.empty(), Optional.empty()));
+        stringFormatParams.put("uriRefParam", new LexString(Optional.of("uri-reference"), Optional.empty(),
+                Optional.empty(), Optional.empty(), Optional.empty()));
+        stringFormatParams.put("uriTemplateParam", new LexString(Optional.of("uri-template"), Optional.empty(),
+                Optional.empty(), Optional.empty(), Optional.empty()));
+        stringFormatParams.put("emailParam", new LexString(Optional.of("email"), Optional.empty(), Optional.empty(),
+                Optional.empty(), Optional.empty()));
+        stringFormatParams.put("hostnameParam", new LexString(Optional.of("hostname"), Optional.empty(),
+                Optional.empty(), Optional.empty(), Optional.empty()));
+        stringFormatParams.put("ipv4Param", new LexString(Optional.of("ipv4"), Optional.empty(), Optional.empty(),
+                Optional.empty(), Optional.empty()));
+        stringFormatParams.put("ipv6Param", new LexString(Optional.of("ipv6"), Optional.empty(), Optional.empty(),
+                Optional.empty(), Optional.empty()));
 
         argList.add(
                 Arguments.of(TestUtils.createLexiconWithParams("com.example.stringFormatParams", stringFormatParams),
                         "atUriParam", "com.atproto.syntax.AtUri"));
         argList.add(
                 Arguments.of(TestUtils.createLexiconWithParams("com.example.stringFormatParams", stringFormatParams),
-                        "cidParam", "com.atproto.common.Cid")); // Assuming you have a Cid class.
+                        "cidParam", "com.atproto.common.Cid"));
 
         argList.add(
                 Arguments.of(TestUtils.createLexiconWithParams("com.example.stringFormatParams", stringFormatParams),
-                        "didParam", "com.atproto.syntax.Did")); // Assuming you have a Did class
+                        "didParam", "com.atproto.syntax.Did"));
 
         argList.add(
                 Arguments.of(TestUtils.createLexiconWithParams("com.example.stringFormatParams", stringFormatParams),
-                        "handleParam", "com.atproto.syntax.Handle")); // Assuming you have a Handle class
+                        "handleParam", "com.atproto.syntax.Handle"));
 
         argList.add(
                 Arguments.of(TestUtils.createLexiconWithParams("com.example.stringFormatParams", stringFormatParams),
-                        "nsidParam", "com.atproto.syntax.Nsid")); // Assuming you have an NSID class.
+                        "nsidParam", "com.atproto.syntax.Nsid"));
 
         argList.add(
                 Arguments.of(TestUtils.createLexiconWithParams("com.example.stringFormatParams", stringFormatParams),
@@ -546,6 +562,27 @@ public class ClientGeneratorTest {
         argList.add(
                 Arguments.of(TestUtils.createLexiconWithParams("com.example.stringFormatParams", stringFormatParams),
                         "languageParam", "java.util.Locale"));
+        argList.add(
+                Arguments.of(TestUtils.createLexiconWithParams("com.example.stringFormatParams", stringFormatParams),
+                        "uriParam", "java.net.URI"));
+        argList.add(
+                Arguments.of(TestUtils.createLexiconWithParams("com.example.stringFormatParams", stringFormatParams),
+                        "uriRefParam", "java.net.URI")); // Assuming URI for uri-reference
+        argList.add(
+                Arguments.of(TestUtils.createLexiconWithParams("com.example.stringFormatParams", stringFormatParams),
+                        "uriTemplateParam", "java.lang.String")); // Assuming String for uri-template (no built-in type)
+        argList.add(
+                Arguments.of(TestUtils.createLexiconWithParams("com.example.stringFormatParams", stringFormatParams),
+                        "emailParam", "java.lang.String")); // Assuming String for email
+        argList.add(
+                Arguments.of(TestUtils.createLexiconWithParams("com.example.stringFormatParams", stringFormatParams),
+                        "hostnameParam", "java.lang.String")); // Assuming String for hostname
+        argList.add(
+                Arguments.of(TestUtils.createLexiconWithParams("com.example.stringFormatParams", stringFormatParams),
+                        "ipv4Param", "java.net.InetAddress")); // Assuming InetAddress for IPv4
+        argList.add(
+                Arguments.of(TestUtils.createLexiconWithParams("com.example.stringFormatParams", stringFormatParams),
+                        "ipv6Param", "java.net.InetAddress")); // Assuming InetAddress for IPv6
 
         return argList.stream();
     }
