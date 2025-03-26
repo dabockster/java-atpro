@@ -1,4 +1,4 @@
-// src/test/java/com/atproto/codegen/ClientGeneratorMockingTest.java
+// src/main/test/java/com/atproto/codegen/ClientGeneratorMockingTest.java
 
 package com.atproto.codegen;
 
@@ -8,226 +8,332 @@ import static org.mockito.Mockito.*;
 import com.atproto.api.AtpResponse;
 import com.atproto.api.xrpc.XrpcClient;
 import com.atproto.api.xrpc.XrpcException;
-import com.atproto.lexicon.models.LexDefinition;
-import com.atproto.lexicon.models.LexXrpcBody;
-import com.atproto.lexicon.models.LexXrpcQuery;
-import com.atproto.lexicon.models.LexiconDoc;
+import com.atproto.lexicon.models.*;
+
 import java.io.IOException;
+import java.lang.reflect.InvocationTargetException;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ExecutionException;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentMatchers;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 @ExtendWith(MockitoExtension.class) // Use MockitoExtension for JUnit 5 integration
 public class ClientGeneratorMockingTest {
 
-    @Mock
-    private XrpcClient mockXrpcClient; // Mock the XrpcClient
+        @Mock
+        private XrpcClient mockXrpcClient; // Mock the XrpcClient
 
-    private ClientGenerator generator;
+        private ClientGenerator generator;
 
-    @BeforeEach
-    public void setUp() {
-        generator = new ClientGenerator(); // Initialize in setup for each test
-    }
+        @BeforeEach
+        public void setUp() {
+                generator = new ClientGenerator(); // Initialize in setup for each test
+        }
 
-    private LexiconDoc createSimpleQueryLexicon() {
-        // Helper method from ClientGeneratorTest - make sure it or a similar utility
-        // is accessible. For now, I'm assuming it's in a common test utility class.
-        // We can refactor this later if needed.
+        // Assume TestUtils helpers like createSimpleQueryLexicon,
+        // createProcedureLexicon etc. are available
+        // (copied/adapted from ClientGeneratorTest or a shared TestUtils class)
 
-        List<LexDefinition> defs = new ArrayList<>();
-        LexXrpcBody output = new LexXrpcBody("application/json", Optional.empty(), Optional.empty());
-        LexXrpcQuery query = new LexXrpcQuery(Optional.empty(), Optional.empty(),
-                Optional.empty(), Optional.of(output), new ArrayList<>());
-        defs.add(new LexDefinition("main", "query", query));
+        @Test
+        public void testGenerateClientForSimpleQuery_Success() throws Exception {
+                LexiconDoc lexiconDoc = TestUtils.createSimpleQueryLexicon();
+                String lexiconId = lexiconDoc.getId(); // "com.example.simpleQuery"
+                String generatedClassName = "com.example.SimpleQueryClient";
+                String generatedMethodName = "simpleQuery"; // Method name derived from lexicon ID
 
-        return new LexiconDoc(
-                1,
-                "com.example.simpleQuery",
-                Optional.of(0),
-                Optional.empty(),
-                defs.stream().collect(java.util.stream.Collectors.toMap(LexDefinition::getId,
-                        java.util.function.Function.identity())));
-    }
+                // --- Arrange ---
+                // Create a mock AtpResponse with expected data (assuming Void or a simple type)
+                // Let's assume void output for simplicity
+                AtpResponse<Void> mockSuccessResponse = new AtpResponse<>(200, Optional.empty(),
+                                Map.of("Content-Type", List.of("application/json"))); // Optional<Void> for no output
+                                                                                      // body
+                CompletableFuture<AtpResponse<Void>> futureResponse = CompletableFuture
+                                .completedFuture(mockSuccessResponse);
 
-    private LexiconDoc createSimpleProcedureLexicon() {
-        List<LexDefinition> defs = new ArrayList<>();
+                // Stub the sendQuery method to return the mock response wrapped in a
+                // CompletableFuture
+                when(mockXrpcClient.sendQuery(
+                                eq(lexiconId),
+                                ArgumentMatchers.<Optional<Object>>any(), // Optional params (none here)
+                                ArgumentMatchers.<Optional<Map<String, String>>>any() // Optional headers
+                )).thenReturn(futureResponse);
 
-        // Define request body (if any)
-        Map<String, com.atproto.lexicon.models.LexPrimitive> properties = new java.util.HashMap<>();
-        properties.put("message", new com.atproto.lexicon.models.LexString(Optional.empty(), Optional.empty(),
-                Optional.empty(), Optional.empty(), Optional.empty()));
+                // --- Act ---
+                // Generate the client code
+                String generatedCode = generator.generateClient(lexiconDoc);
 
-        com.atproto.lexicon.models.LexXrpcBody input = new com.atproto.lexicon.models.LexXrpcBody("application/json",
-                Optional.of(new com.atproto.lexicon.models.LexObject(Optional.empty(), Optional.empty(), properties,
-                        new ArrayList<>())),
-                Optional.empty());
+                // Compile the generated code
+                Class<?> generatedClientClass = InMemoryCompiler.compile(generatedClassName, generatedCode);
 
-        // Define response body (if any).
-        com.atproto.lexicon.models.LexXrpcBody output = new com.atproto.lexicon.models.LexXrpcBody("application/json",
-                Optional.empty(),
-                Optional.empty());
+                // Create an instance of the generated client
+                Object clientInstance = generatedClientClass.getDeclaredConstructor().newInstance();
 
-        com.atproto.lexicon.models.LexXrpcProcedure procedure = new com.atproto.lexicon.models.LexXrpcProcedure(
-                Optional.of(input),
-                Optional.empty(),
-                Optional.of(output),
-                new ArrayList<>());
+                // Inject the mockXrpcClient
+                java.lang.reflect.Field xrpcClientField = generatedClientClass.getDeclaredField("xrpcClient");
+                xrpcClientField.setAccessible(true);
+                xrpcClientField.set(clientInstance, mockXrpcClient);
 
-        defs.add(new LexDefinition("main", "procedure", procedure));
+                // Invoke the generated method using reflection
+                java.lang.reflect.Method simpleQueryMethod = generatedClientClass.getMethod(generatedMethodName);
+                CompletableFuture<AtpResponse<?>> resultFuture = (CompletableFuture<AtpResponse<?>>) simpleQueryMethod
+                                .invoke(clientInstance);
 
-        return new LexiconDoc(
-                1,
-                "com.example.simpleProcedure",
-                Optional.of(0),
-                Optional.empty(),
-                defs.stream().collect(java.util.stream.Collectors.toMap(LexDefinition::getId,
-                        java.util.function.Function.identity())));
+                // --- Assert ---
+                // Wait for the future to complete and retrieve the result
+                AtpResponse<?> actualResponse = resultFuture.get(); // This should be the mock response
 
-    }
+                // Verify sendQuery was called exactly once with the correct arguments
+                verify(mockXrpcClient, times(1)).sendQuery(
+                                eq(lexiconId),
+                                ArgumentMatchers.<Optional<Object>>any(), // Optional params (none here)
+                                ArgumentMatchers.<Optional<Map<String, String>>>any() // Optional headers
+                );
 
-    @Test
-    public void testGenerateClientForSimpleQuery_Success() throws Exception {
-        LexiconDoc lexiconDoc = createSimpleQueryLexicon();
+                // Check the response
+                assertNotNull(actualResponse);
+                assertEquals(200, actualResponse.getStatusCode());
+                assertFalse(actualResponse.getResponse().isPresent()); // No response body expected
+                assertNotNull(actualResponse.getHeaders());
+                assertTrue(actualResponse.getHeaders().containsKey("Content-Type"));
+        }
 
-        // Create a mock AtpResponse with expected data
-        AtpResponse<String> mockResponse = new AtpResponse<>(200, "{\"message\": \"success\"}", Map.of());// Use a map
+        @Test
+        public void testGenerateClientForSimpleQuery_Error() throws Exception {
+                LexiconDoc lexiconDoc = TestUtils.createSimpleQueryLexicon();
+                String lexiconId = lexiconDoc.getId(); // "com.example.simpleQuery"
+                String generatedClassName = "com.example.SimpleQueryClient";
+                String generatedMethodName = "simpleQuery"; // Method name derived from lexicon ID
 
-        // Stub the sendQuery method to return the mock response
-        when(mockXrpcClient.sendQuery(anyString(), any(), any()))
-                .thenReturn(CompletableFuture.completedFuture(mockResponse));
+                // --- Arrange ---
+                // Create a simulated XRPCException
+                XrpcException simXrpcException = new XrpcException(400, "Bad Request", Optional.empty());
 
-        // Generate the client code
-        String generatedCode = generator.generateClient(lexiconDoc);
+                // Stub the sendQuery method to throw the XrpcException wrapped in a
+                // CompletableFuture
+                when(mockXrpcClient.sendQuery(
+                                eq(lexiconId),
+                                ArgumentMatchers.<Optional<Object>>any(), // Optional params (none here)
+                                ArgumentMatchers.<Optional<Map<String, String>>>any() // Optional headers
+                )).thenReturn(CompletableFuture.failedFuture(simXrpcException));
 
-        // --- Compilation and Reflection (Important) ---
-        // 1. Compile the generated code. This is the CRUCIAL step
-        Class<?> generatedClientClass = InMemoryCompiler.compile("com.example.SimpleQueryClient", generatedCode);
+                // --- Act ---
+                // Generate the client code
+                String generatedCode = generator.generateClient(lexiconDoc);
 
-        // 2. Create an instance of the generated client.
-        Object clientInstance = generatedClientClass.getDeclaredConstructor().newInstance();
+                // Compile the generated code
+                Class<?> generatedClientClass = InMemoryCompiler.compile(generatedClassName, generatedCode);
 
-        // 3. Inject the mockXrpcClient into the generated client instance.
-        // This is where we replace the *real* XrpcClient with our *mock*.
-        java.lang.reflect.Field xrpcClientField = generatedClientClass.getDeclaredField("xrpcClient");
-        xrpcClientField.setAccessible(true); // Allow access to the private field
-        xrpcClientField.set(clientInstance, mockXrpcClient);
+                // Create an instance of the generated client
+                Object clientInstance = generatedClientClass.getDeclaredConstructor().newInstance();
 
-        // 4. Invoke the generated method (using reflection).
-        java.lang.reflect.Method method = generatedClientClass.getMethod("simpleQuery"); // Get the method.
-        Object result = method.invoke(clientInstance); // Invoke the method.
+                // Inject the mockXrpcClient
+                java.lang.reflect.Field xrpcClientField = generatedClientClass.getDeclaredField("xrpcClient");
+                xrpcClientField.setAccessible(true);
+                xrpcClientField.set(clientInstance, mockXrpcClient);
 
-        // --- Assertions ---
-        // Verify that sendQuery was called *exactly once* with the expected arguments.
-        verify(mockXrpcClient, times(1)).sendQuery(eq("com.example.simpleQuery"), eq(Optional.empty()),
-                eq(Optional.empty()));
+                // Invoke the generated method using reflection
+                java.lang.reflect.Method simpleQueryMethod = generatedClientClass.getMethod(generatedMethodName);
+                CompletableFuture<AtpResponse<?>> resultFuture = (CompletableFuture<AtpResponse<?>>) simpleQueryMethod
+                                .invoke(clientInstance);
 
-        // Assert on the result from calling client's method (using the mocked repsonse)
-        assertInstanceOf(AtpResponse.class, result); // The result is of type AtpResponse of Map.
-        AtpResponse<?> atpResponse = (AtpResponse<?>) result; // Cast to AtpResponse
+                // --- Assert ---
+                // Wait for the future to complete and check for an exception
+                Exception exception = assertThrows(ExecutionException.class, () -> resultFuture.get());
 
-        assertEquals(200, atpResponse.getStatusCode());
-        assertEquals("{\"message\": \"success\"}", atpResponse.getResponse()); // Check for mocked return.
+                assertTrue(exception.getCause() instanceof XrpcException);
+                XrpcException xrpcException = (XrpcException) exception.getCause();
 
-    }
+                // Verify sendQuery was called exactly once with the correct arguments
+                verify(mockXrpcClient, times(1)).sendQuery(
+                                eq(lexiconId),
+                                ArgumentMatchers.<Optional<Object>>any(), // Optional params (none here)
+                                ArgumentMatchers.<Optional<Map<String, String>>>any() // Optional headers
+                );
 
-    @Test
-    public void testGenerateClientForSimpleQuery_Error() throws Exception { // Test XRPC error cases
-        LexiconDoc lexiconDoc = createSimpleQueryLexicon();
+                // Check the exception details
+                assertNotNull(xrpcException);
+                assertEquals(400, xrpcException.getStatusCode());
+                assertEquals("Bad Request", xrpcException.getMessage());
+                assertFalse(xrpcException.getResponse().isPresent());
+        }
 
-        // Stub the sendQuery method to throw an XRPCException.
-        when(mockXrpcClient.sendQuery(anyString(), any(), any()))
-                .thenReturn(CompletableFuture.failedFuture(new XRPCException(400, "Bad Request", Optional.empty()))); // Simulate
-                                                                                                                      // error.
+        @Test
+        public void testGenerateClientForSimpleProcedure_Success() throws Exception {
+                LexiconDoc lexiconDoc = TestUtils.createSimpleProcedureLexicon();
+                String lexiconId = lexiconDoc.getId(); // "com.example.simpleProcedure"
+                String generatedClassName = "com.example.SimpleProcedureClient";
+                String generatedMethodName = "simpleProcedure"; // Method name derived from lexicon ID
 
-        // Generate the client code
-        String generatedCode = generator.generateClient(lexiconDoc);
+                // --- Arrange ---
+                // Create a mock input object for the procedure
+                LexiconDoc.Input inputDoc = lexiconDoc.getDefinitions().get("main").getProcedure().getInput()
+                                .orElseThrow();
+                LexObject inputLexObject = (LexObject) inputDoc.getType();
+                Map<String, LexPrimitive> properties = inputLexObject.getProperties();
+                Map<String, Object> inputValues = new HashMap<>();
+                for (Map.Entry<String, LexPrimitive> entry : properties.entrySet()) {
+                        // Populate with dummy values for now
+                        inputValues.put(entry.getKey(), "testValue");
+                }
 
-        // --- Compilation and Reflection (Important) ---
+                String inputClassName = "com.example.SimpleProcedureProcedureInput";
 
-        Class<?> generatedClientClass = InMemoryCompiler.compile("com.example.SimpleQueryClient", generatedCode);
+                // Create a mock AtpResponse with expected data
+                AtpResponse<Void> mockSuccessResponse = new AtpResponse<>(200, Optional.empty(),
+                                Map.of("Content-Type", List.of("application/json"))); // Optional<Void> for no output
+                                                                                      // body
+                CompletableFuture<AtpResponse<Void>> futureResponse = CompletableFuture
+                                .completedFuture(mockSuccessResponse);
 
-        // 2. Create an instance of the generated client.
-        Object clientInstance = generatedClientClass.getDeclaredConstructor().newInstance();
+                // Stub the sendProcedure method to return the mock response wrapped in a
+                // CompletableFuture
+                when(mockXrpcClient.sendProcedure(
+                                eq(lexiconId),
+                                ArgumentMatchers.<Optional<Object>>any(), // Optional params (none here)
+                                ArgumentMatchers.<Object>any(), // Required input object
+                                ArgumentMatchers.<Optional<Map<String, String>>>any() // Optional headers
+                )).thenReturn(futureResponse);
 
-        // 3. Inject the mockXrpcClient into the generated client instance.
-        java.lang.reflect.Field xrpcClientField = generatedClientClass.getDeclaredField("xrpcClient");
-        xrpcClientField.setAccessible(true);
-        xrpcClientField.set(clientInstance, mockXrpcClient);
+                // --- Act ---
+                // Generate the client code
+                String generatedCode = generator.generateClient(lexiconDoc);
 
-        // 4. Invoke the generated method (using reflection).
-        java.lang.reflect.Method method = generatedClientClass.getMethod("simpleQuery");
+                // Compile the generated code
+                Class<?> generatedClientClass = InMemoryCompiler.compile(generatedClassName, generatedCode);
 
-        // --- Assertions ---
+                // Create an instance of the generated client
+                Object clientInstance = generatedClientClass.getDeclaredConstructor().newInstance();
 
-        // Verify that sendQuery was called *exactly once* with the expected arguments.
-        // Use assertThrows to verify that the expected exception is thrown.
-        XRPCException thrown = assertThrows(
-                XRPCException.class,
-                () -> method.invoke(clientInstance),
-                "Expected sendQuery to throw, but it didn't");
+                // Inject the mockXrpcClient
+                java.lang.reflect.Field xrpcClientField = generatedClientClass.getDeclaredField("xrpcClient");
+                xrpcClientField.setAccessible(true);
+                xrpcClientField.set(clientInstance, mockXrpcClient);
 
-        assertEquals(400, thrown.getStatusCode());
-        assertEquals("Bad Request", thrown.getMessage());
-    }
+                // Create an instance of the procedure input class using reflection
+                Class<?> inputClass = Class.forName(inputClassName);
+                Object inputObject = inputClass.getDeclaredConstructor().newInstance();
+                for (Map.Entry<String, Object> entry : inputValues.entrySet()) {
+                        java.lang.reflect.Field field = inputClass.getDeclaredField(entry.getKey());
+                        field.setAccessible(true);
+                        field.set(inputObject, entry.getValue());
+                }
 
-    @Test
-    public void testGenerateClientForSimpleProcedure_Success() throws Exception {
-        LexiconDoc lexiconDoc = createSimpleProcedureLexicon();
+                // Invoke the generated method using reflection
+                java.lang.reflect.Method simpleProcedureMethod = generatedClientClass.getMethod(generatedMethodName,
+                                inputClass);
+                CompletableFuture<AtpResponse<?>> resultFuture = (CompletableFuture<AtpResponse<?>>) simpleProcedureMethod
+                                .invoke(clientInstance, inputObject);
 
-        // Create a mock AtpResponse with expected data
-        AtpResponse<String> mockResponse = new AtpResponse<>(200, "{\"message\": \"success\"}", Map.of());// Use a map
+                // --- Assert ---
+                // Wait for the future to complete and retrieve the result
+                AtpResponse<?> actualResponse = resultFuture.get(); // This should be the mock response
 
-        // Stub the sendQuery method to return the mock response
-        when(mockXrpcClient.sendProcedure(anyString(), any(), any(), any()))
-                .thenReturn(CompletableFuture.completedFuture(mockResponse));
+                // Verify sendProcedure was called exactly once with the correct arguments
+                verify(mockXrpcClient, times(1)).sendProcedure(
+                                eq(lexiconId),
+                                ArgumentMatchers.<Optional<Object>>any(), // Optional params (none here)
+                                ArgumentMatchers.<Object>any(), // Required input object
+                                ArgumentMatchers.<Optional<Map<String, String>>>any() // Optional headers
+                );
 
-        // Generate the client code
-        String generatedCode = generator.generateClient(lexiconDoc);
+                // Check the response
+                assertNotNull(actualResponse);
+                assertEquals(200, actualResponse.getStatusCode());
+                assertFalse(actualResponse.getResponse().isPresent()); // No response body expected
+                assertNotNull(actualResponse.getHeaders());
+                assertTrue(actualResponse.getHeaders().containsKey("Content-Type"));
+        }
 
-        // --- Compilation and Reflection (Important) ---
-        // 1. Compile the generated code. This is the CRUCIAL step
-        Class<?> generatedClientClass = InMemoryCompiler.compile("com.example.SimpleProcedureClient", generatedCode);
+        @Test
+        public void testGenerateClientForSimpleProcedure_Error() throws Exception {
+                LexiconDoc lexiconDoc = TestUtils.createSimpleProcedureLexicon();
+                String lexiconId = lexiconDoc.getId(); // "com.example.simpleProcedure"
+                String generatedClassName = "com.example.SimpleProcedureClient";
+                String generatedMethodName = "simpleProcedure"; // Method name derived from lexicon ID
 
-        // 2. Create an instance of the generated client.
-        Object clientInstance = generatedClientClass.getDeclaredConstructor().newInstance();
+                // --- Arrange ---
+                // Create a mock input object for the procedure
+                LexiconDoc.Input inputDoc = lexiconDoc.getDefinitions().get("main").getProcedure().getInput()
+                                .orElseThrow();
+                LexObject inputLexObject = (LexObject) inputDoc.getType();
+                Map<String, LexPrimitive> properties = inputLexObject.getProperties();
+                Map<String, Object> inputValues = new HashMap<>();
+                for (Map.Entry<String, LexPrimitive> entry : properties.entrySet()) {
+                        // Populate with dummy values for now
+                        inputValues.put(entry.getKey(), "testValue");
+                }
 
-        // 3. Inject the mockXrpcClient into the generated client instance.
-        // This is where we replace the *real* XrpcClient with our *mock*.
-        java.lang.reflect.Field xrpcClientField = generatedClientClass.getDeclaredField("xrpcClient");
-        xrpcClientField.setAccessible(true); // Allow access to the private field
-        xrpcClientField.set(clientInstance, mockXrpcClient);
+                String inputClassName = "com.example.SimpleProcedureProcedureInput";
 
-        // 4. Invoke the generated method (using reflection).
-        // Since the generated code requires an input, prepare an input class and
-        // instantiate an object to provide.
+                // Create a simulated XRPCException
+                XrpcException simXrpcException = new XrpcException(400, "Bad Request", Optional.empty());
 
-        Class<?> inputClass = Class.forName("com.example.SimpleProcedureProcedureInput");
-        Object input = inputClass.getDeclaredConstructor().newInstance();
+                // Stub the sendProcedure method to throw the XrpcException wrapped in a
+                // CompletableFuture
+                when(mockXrpcClient.sendProcedure(
+                                eq(lexiconId),
+                                ArgumentMatchers.<Optional<Object>>any(), // Optional params (none here)
+                                ArgumentMatchers.<Object>any(), // Required input object
+                                ArgumentMatchers.<Optional<Map<String, String>>>any() // Optional headers
+                )).thenReturn(CompletableFuture.failedFuture(simXrpcException));
 
-        java.lang.reflect.Method method = generatedClientClass.getMethod("simpleProcedure", inputClass); // Get the
-                                                                                                         // method
-                                                                                                         // signature
-        Object result = method.invoke(clientInstance, input); // Invoke the method.
+                // --- Act ---
+                // Generate the client code
+                String generatedCode = generator.generateClient(lexiconDoc);
 
-        // --- Assertions ---
-        // Verify that sendQuery was called *exactly once* with the expected arguments.
-        verify(mockXrpcClient, times(1)).sendProcedure(eq("com.example.simpleProcedure"), eq(Optional.empty()), any(),
-                eq(Optional.empty()));
+                // Compile the generated code
+                Class<?> generatedClientClass = InMemoryCompiler.compile(generatedClassName, generatedCode);
 
-        // Assert on the result from calling client's method (using the mocked repsonse)
-        assertInstanceOf(AtpResponse.class, result); // The result is of type AtpResponse of Map.
-        AtpResponse<?> atpResponse = (AtpResponse<?>) result; // Cast to AtpResponse
+                // Create an instance of the generated client
+                Object clientInstance = generatedClientClass.getDeclaredConstructor().newInstance();
 
-        assertEquals(200, atpResponse.getStatusCode());
-        assertEquals("{\"message\": \"success\"}", atpResponse.getResponse()); // Check for mocked return.
+                // Inject the mockXrpcClient
+                java.lang.reflect.Field xrpcClientField = generatedClientClass.getDeclaredField("xrpcClient");
+                xrpcClientField.setAccessible(true);
+                xrpcClientField.set(clientInstance, mockXrpcClient);
 
-    }
+                // Create an instance of the procedure input class using reflection
+                Class<?> inputClass = Class.forName(inputClassName);
+                Object inputObject = inputClass.getDeclaredConstructor().newInstance();
+                for (Map.Entry<String, Object> entry : inputValues.entrySet()) {
+                        java.lang.reflect.Field field = inputClass.getDeclaredField(entry.getKey());
+                        field.setAccessible(true);
+                        field.set(inputObject, entry.getValue());
+                }
+
+                // Invoke the generated method using reflection
+                java.lang.reflect.Method simpleProcedureMethod = generatedClientClass.getMethod(generatedMethodName,
+                                inputClass);
+                CompletableFuture<AtpResponse<?>> resultFuture = (CompletableFuture<AtpResponse<?>>) simpleProcedureMethod
+                                .invoke(clientInstance, inputObject);
+
+                // --- Assert ---
+                // Wait for the future to complete and check for an exception
+                Exception exception = assertThrows(ExecutionException.class, () -> resultFuture.get());
+
+                assertTrue(exception.getCause() instanceof XrpcException);
+                XrpcException xrpcException = (XrpcException) exception.getCause();
+
+                // Verify sendProcedure was called exactly once with the correct arguments
+                verify(mockXrpcClient, times(1)).sendProcedure(
+                                eq(lexiconId),
+                                ArgumentMatchers.<Optional<Object>>any(), // Optional params (none here)
+                                ArgumentMatchers.<Object>any(), // Required input object
+                                ArgumentMatchers.<Optional<Map<String, String>>>any() // Optional headers
+                );
+
+                // Check the exception details
+                assertNotNull(xrpcException);
+                assertEquals(400, xrpcException.getStatusCode());
+                assertEquals("Bad Request", xrpcException.getMessage());
+                assertFalse(xrpcException.getResponse().isPresent());
+        }
 }
