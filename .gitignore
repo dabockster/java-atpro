@@ -25,6 +25,7 @@ build/
 
 # VS Code
 .vscode/
+.roo/
 
 # OS-Generated Files
 .DS_Store
