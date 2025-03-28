@@ -15,6 +15,9 @@ import java.nio.CharBuffer;
 import java.nio.charset.StandardCharsets;
 import java.util.*;
 import java.util.stream.Stream;
+import java.util.HashMap; // Ensure HashMap is imported
+import com.atproto.common.Cid; // Import Cid if not already present
+
 
 import org.junit.jupiter.params.provider.Arguments;
 
@@ -546,11 +549,64 @@ public class TestUtils {
                                 defs.stream().collect(java.util.stream.Collectors.toMap(
                                                 LexDefinition::getId,
                                                 java.util.function.Function.identity())));
+}
 
-        }
-        // ---------- INVALID LEXICON CREATION METHODS ----------
+public static LexiconDoc createQueryWithOutputLexicon() {
+        List<LexDefinition> defs = new ArrayList<>();
 
-        public static LexiconDoc createLexiconWithoutDefs() {
+        // Define the output object schema
+        Map<String, LexPrimitive> outputProperties = new HashMap<>();
+        outputProperties.put("message", new LexString(Optional.empty(), Optional.empty(),
+                        Optional.empty(), Optional.empty(), Optional.empty()));
+        outputProperties.put("count", new LexInteger(Optional.empty(), Optional.empty(),
+                        Optional.empty(), Optional.empty()));
+        LexObject outputObject = new LexObject(Optional.empty(), Optional.empty(),
+                        outputProperties, new ArrayList<>());
+
+        LexXrpcBody output = new LexXrpcBody("application/json", Optional.of(outputObject),
+                        Optional.empty());
+
+        LexXrpcQuery query = new LexXrpcQuery(Optional.empty(), Optional.empty(),
+                        Optional.empty(), Optional.of(output), new ArrayList<>());
+        defs.add(new LexDefinition("main", "query", query));
+
+        return new LexiconDoc(1, "com.example.outputQuery", Optional.of(0),
+                        Optional.empty(),
+                        defs.stream().collect(java.util.stream.Collectors.toMap(
+                                        LexDefinition::getId,
+                                        java.util.function.Function.identity())));
+}
+
+public static LexiconDoc createUploadBlobLexicon() {
+        List<LexDefinition> defs = new ArrayList<>();
+
+        // Define the output object schema containing a CidLink
+        Map<String, LexType> outputProperties = new HashMap<>();
+        outputProperties.put("blob", new LexCidLink(Optional.empty(), Optional.empty()));
+        LexObject outputObject = new LexObject(Optional.empty(), Optional.empty(),
+                        outputProperties, List.of("blob")); // blob is required
+
+        LexXrpcBody output = new LexXrpcBody("application/json", Optional.of(outputObject),
+                        Optional.empty());
+
+        // Define the input body (accepts any content type, typically image/* or similar)
+        LexXrpcBody input = new LexXrpcBody("*/*", Optional.empty(), Optional.empty());
+
+
+        LexXrpcProcedure procedure = new LexXrpcProcedure(Optional.of(input),
+                        Optional.empty(), Optional.of(output), new ArrayList<>());
+        defs.add(new LexDefinition("main", "procedure", procedure));
+
+        return new LexiconDoc(1, "com.atproto.repo.uploadBlob", Optional.of(0),
+                        Optional.empty(),
+                        defs.stream().collect(java.util.stream.Collectors.toMap(
+                                        LexDefinition::getId,
+                                        java.util.function.Function.identity())));
+}
+
+// ---------- INVALID LEXICON CREATION METHODS ----------
+
+public static LexiconDoc createLexiconWithoutDefs() {
                 // Create a LexiconDoc without 'defs'. This is invalid.
                 return new LexiconDoc(1, "com.example.invalid.nodefs", Optional.of(0),
                                 Optional.empty(), Map.of());
