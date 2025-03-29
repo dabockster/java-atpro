@@ -1,8 +1,5 @@
 package com.atproto.lexicon;
 
-import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.JsonParseException;
-import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -10,18 +7,18 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
-import java.io.IOException;
 import java.util.HashMap;
 import java.util.Map;
 
 import static org.junit.jupiter.api.Assertions.*;
-import static org.mockito.Mockito.*;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
 public class LexiconParserTest {
 
     @Mock
-    private ObjectMapper objectMapper;
+    private JsonParser jsonParser;
 
     @InjectMocks
     private LexiconParser lexiconParser;
@@ -30,29 +27,34 @@ public class LexiconParserTest {
 
     @BeforeEach
     void setUp() {
-        lexiconParser = new LexiconParser();
+        when(jsonParser.parse(any(String.class))).thenReturn(new JsonNode());
     }
 
     @Test
-    public void testLexiconParsing() throws IOException {
+    public void testLexiconParsing() {
         // Test valid lexicon parsing
-        JsonNode schema = objectMapper.readTree(TEST_LEXICON);
-        when(objectMapper.readTree(TEST_LEXICON)).thenReturn(schema);
-
         assertTrue(lexiconParser.parse(TEST_LEXICON));
 
         // Test invalid lexicon (missing required fields)
         String invalidLexicon = "{\"$schema\":\"https://atproto.com/lexicon-1.json\",\"lexicon\":1,\"id\":\"com.example.schema\",\"description\":\"Test schema\"}";
         assertFalse(lexiconParser.parse(invalidLexicon));
 
+        // Test invalid schema version
+        String invalidSchema = "{\"$schema\":\"https://atproto.com/lexicon-2.json\",\"lexicon\":1,\"id\":\"com.example.schema\",\"description\":\"Test schema\",\"type\":\"object\"}";
+        assertFalse(lexiconParser.parse(invalidSchema));
+
+        // Test invalid lexicon version
+        String invalidVersion = "{\"$schema\":\"https://atproto.com/lexicon-1.json\",\"lexicon\":2,\"id\":\"com.example.schema\",\"description\":\"Test schema\",\"type\":\"object\"}";
+        assertFalse(lexiconParser.parse(invalidVersion));
+
         // Test invalid JSON
-        assertThrows(JsonParseException.class, () -> {
+        assertThrows(IllegalArgumentException.class, () -> {
             lexiconParser.parse("invalid_json");
         });
     }
 
     @Test
-    public void testTypeValidation() throws IOException {
+    public void testTypeValidation() {
         // Test valid type definition
         assertTrue(lexiconParser.validateTypeDefinition(TEST_LEXICON));
 
@@ -63,6 +65,10 @@ public class LexiconParserTest {
         // Test invalid type (missing type)
         String missingType = "{\"$schema\":\"https://atproto.com/lexicon-1.json\",\"lexicon\":1,\"id\":\"com.example.schema\",\"description\":\"Test schema\"}";
         assertFalse(lexiconParser.validateTypeDefinition(missingType));
+
+        // Test invalid type hierarchy
+        String invalidHierarchy = "{\"$schema\":\"https://atproto.com/lexicon-1.json\",\"lexicon\":1,\"id\":\"com.example.schema\",\"description\":\"Test schema\",\"type\":\"object\",\"properties\":{\"name\":{\"type\":\"array\",\"items\":{\"type\":\"object\"}}}}}";
+        assertFalse(lexiconParser.validateTypeDefinition(invalidHierarchy));
 
         // Additional type validation test
         String lexicon = "{\"$schema\": \"https://atproto.com/lexicon-1.json\",\n" +
@@ -94,7 +100,7 @@ public class LexiconParserTest {
     }
 
     @Test
-    public void testSchemaGeneration() throws IOException {
+    public void testSchemaGeneration() {
         // Test schema generation from lexicon
         String generatedSchema = lexiconParser.generateSchema(TEST_LEXICON);
         assertNotNull(generatedSchema);
@@ -108,6 +114,10 @@ public class LexiconParserTest {
         // Test schema evolution
         String evolvedLexicon = "{\"$schema\":\"https://atproto.com/lexicon-1.json\",\"lexicon\":1,\"id\":\"com.example.schema\",\"description\":\"Test schema\",\"type\":\"object\",\"properties\":{\"name\":{\"type\":\"string\",\"description\":\"Name field\"},\"age\":{\"type\":\"number\",\"description\":\"Age field\"}}}";
         assertTrue(lexiconParser.validateSchemaEvolution(TEST_LEXICON, evolvedLexicon));
+
+        // Test breaking schema change
+        String breakingChange = "{\"$schema\":\"https://atproto.com/lexicon-1.json\",\"lexicon\":1,\"id\":\"com.example.schema\",\"description\":\"Test schema\",\"type\":\"object\",\"properties\":{\"name\":{\"type\":\"number\",\"description\":\"Name field\"}}}";
+        assertFalse(lexiconParser.validateSchemaEvolution(TEST_LEXICON, breakingChange));
 
         // Additional schema generation test
         String lexicon = "{\"$schema\": \"https://atproto.com/lexicon-1.json\",\n" +
@@ -172,7 +182,7 @@ public class LexiconParserTest {
     @Test
     public void testErrorHandling() {
         // Test invalid JSON parsing
-        assertThrows(JsonParseException.class, () -> {
+        assertThrows(IllegalArgumentException.class, () -> {
             lexiconParser.parse("invalid_json");
         });
 
@@ -185,6 +195,12 @@ public class LexiconParserTest {
         assertThrows(LexiconValidationException.class, () -> {
             String invalidType = "{\"$schema\":\"https://atproto.com/lexicon-1.json\",\"lexicon\":1,\"id\":\"com.example.schema\",\"description\":\"Test schema\",\"type\":\"unknown\"}";
             lexiconParser.validateTypeDefinition(invalidType);
+        });
+
+        // Test invalid schema version
+        assertThrows(LexiconValidationException.class, () -> {
+            String invalidSchema = "{\"$schema\":\"https://atproto.com/lexicon-2.json\",\"lexicon\":1,\"id\":\"com.example.schema\",\"description\":\"Test schema\",\"type\":\"object\"}";
+            lexiconParser.parse(invalidSchema);
         });
 
         // Additional error handling test

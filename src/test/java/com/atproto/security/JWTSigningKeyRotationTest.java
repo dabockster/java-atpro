@@ -5,7 +5,6 @@ import com.atproto.crypto.Secp256k1KeyPair;
 import com.atproto.did.DID;
 import com.atproto.did.DIDDocument;
 import com.atproto.did.DIDResolver;
-import com.atproto.security.jwt.JWTService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -15,7 +14,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.security.Security;
 import java.time.Instant;
-import java.util.concurrent.atomic.AtomicInteger;
+import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.any;

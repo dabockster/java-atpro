@@ -1,27 +1,39 @@
 package com.atproto.concurrency;
 
 import com.atproto.repository.RepositoryManager;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.Timeout;
-import java.util.concurrent.*;
-import java.util.stream.IntStream;
+import org.mockito.Mock;
+import org.mockito.Mockito;
+import org.mockito.MockitoAnnotations;
+
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 
 import static org.junit.jupiter.api.Assertions.*;
+import static org.mockito.Mockito.*;
 
 public class ConcurrentRepositoryAccessTest {
-    private static final int THREAD_COUNT = 20;  // Based on Go implementation's workerCount
-    private static final int ITERATIONS = 100;  // Based on Go's backfill parallel record creates
+    private static final int THREAD_COUNT = 20;
+    private static final int ITERATIONS = 100;
+    
+    @Mock
+    private RepositoryManager repositoryManager;
+    
+    @BeforeEach
+    public void setUp() {
+        MockitoAnnotations.openMocks(this);
+    }
 
     @Test
     @Timeout(30)
     public void testConcurrentRepositoryAccess() throws InterruptedException {
-        RepositoryManager repositoryManager = new RepositoryManager();
-        
         ExecutorService executor = Executors.newFixedThreadPool(THREAD_COUNT);
+        CountDownLatch latch = new CountDownLatch(THREAD_COUNT);
         
         try {
-            CountDownLatch latch = new CountDownLatch(THREAD_COUNT);
-            
             for (int i = 0; i < THREAD_COUNT; i++) {
                 executor.submit(() -> {
                     try {
@@ -33,6 +45,12 @@ public class ConcurrentRepositoryAccessTest {
             }
             
             latch.await();
+            
+            // Verify that all operations were called the expected number of times
+            verify(repositoryManager, times(THREAD_COUNT * ITERATIONS)).getRepositoryState();
+            verify(repositoryManager, times(THREAD_COUNT * ITERATIONS)).updateRepositoryState();
+            verify(repositoryManager, times(THREAD_COUNT * ITERATIONS)).uploadBlob();
+            verify(repositoryManager, times(THREAD_COUNT * ITERATIONS)).downloadBlob();
         } finally {
             executor.shutdown();
         }
@@ -55,13 +73,10 @@ public class ConcurrentRepositoryAccessTest {
     @Test
     @Timeout(30)
     public void testRepositorySyncConcurrency() throws InterruptedException {
-        RepositoryManager repositoryManager = new RepositoryManager();
-        
         ExecutorService executor = Executors.newFixedThreadPool(THREAD_COUNT);
+        CountDownLatch latch = new CountDownLatch(THREAD_COUNT);
         
         try {
-            CountDownLatch latch = new CountDownLatch(THREAD_COUNT);
-            
             for (int i = 0; i < THREAD_COUNT; i++) {
                 executor.submit(() -> {
                     try {
@@ -73,6 +88,11 @@ public class ConcurrentRepositoryAccessTest {
             }
             
             latch.await();
+            
+            // Verify that all operations were called the expected number of times
+            verify(repositoryManager, times(THREAD_COUNT * ITERATIONS)).syncRepository();
+            verify(repositoryManager, times(THREAD_COUNT * ITERATIONS)).createCommit();
+            verify(repositoryManager, times(THREAD_COUNT * ITERATIONS)).getLatestCommit();
         } finally {
             executor.shutdown();
         }

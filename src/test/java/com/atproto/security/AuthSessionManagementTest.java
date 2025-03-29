@@ -13,6 +13,7 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.time.Instant;
+import java.util.Map;
 import java.util.UUID;
 
 import static org.junit.jupiter.api.Assertions.*;
@@ -40,97 +41,205 @@ class AuthSessionManagementTest {
     }
 
     @Test
-    void testSessionCreation() throws Exception {
-        AuthSession session = sessionManager.createSession(
-            TEST_DID,
-            TEST_PASSWORD,
-            TEST_PDS,
-            TEST_AUTH_FACTOR_TOKEN
-        );
+    void testSessionCreationWithValidParameters() throws Exception {
+        // Given
+        when(request.getParams()).thenReturn(Map.of(
+            "did", TEST_DID,
+            "password", TEST_PASSWORD,
+            "pds", TEST_PDS,
+            "authFactorToken", TEST_AUTH_FACTOR_TOKEN
+        ));
 
+        // When
+        AuthSession session = sessionManager.createSession(request);
+
+        // Then
         assertNotNull(session);
         assertNotNull(session.getSessionToken());
         assertEquals(TEST_DID, session.getDID());
         assertEquals(TEST_PDS, session.getPDS());
+        assertTrue(session.getExpiresAt().isAfter(Instant.now()));
     }
 
     @Test
-    void testSessionRefresh() throws Exception {
-        // Create initial session
-        AuthSession initialSession = sessionManager.createSession(
-            TEST_DID,
-            TEST_PASSWORD,
-            TEST_PDS,
-            TEST_AUTH_FACTOR_TOKEN
-        );
+    void testSessionCreationWithInvalidDid() {
+        // Given
+        when(request.getParams()).thenReturn(Map.of(
+            "did", "invalid:did",
+            "password", TEST_PASSWORD,
+            "pds", TEST_PDS,
+            "authFactorToken", TEST_AUTH_FACTOR_TOKEN
+        ));
 
-        // Refresh session
-        AuthSession refreshedSession = sessionManager.refreshSession(
-            initialSession.getSessionToken()
+        // When & Then
+        assertThrows(IllegalArgumentException.class, () ->
+            sessionManager.createSession(request)
         );
+    }
 
+    @Test
+    void testSessionCreationWithEmptyPassword() {
+        // Given
+        when(request.getParams()).thenReturn(Map.of(
+            "did", TEST_DID,
+            "password", "",
+            "pds", TEST_PDS,
+            "authFactorToken", TEST_AUTH_FACTOR_TOKEN
+        ));
+
+        // When & Then
+        assertThrows(IllegalArgumentException.class, () ->
+            sessionManager.createSession(request)
+        );
+    }
+
+    @Test
+    void testSessionCreationWithInvalidPds() {
+        // Given
+        when(request.getParams()).thenReturn(Map.of(
+            "did", TEST_DID,
+            "password", TEST_PASSWORD,
+            "pds", "invalid:pds",
+            "authFactorToken", TEST_AUTH_FACTOR_TOKEN
+        ));
+
+        // When & Then
+        assertThrows(IllegalArgumentException.class, () ->
+            sessionManager.createSession(request)
+        );
+    }
+
+    @Test
+    void testSessionCreationWithInvalidAuthFactorToken() {
+        // Given
+        when(request.getParams()).thenReturn(Map.of(
+            "did", TEST_DID,
+            "password", TEST_PASSWORD,
+            "pds", TEST_PDS,
+            "authFactorToken", "123"
+        ));
+
+        // When & Then
+        assertThrows(IllegalArgumentException.class, () ->
+            sessionManager.createSession(request)
+        );
+    }
+
+    @Test
+    void testSessionRefreshWithValidToken() throws Exception {
+        // Given
+        AuthSession initialSession = createTestSession();
+        when(request.getParams()).thenReturn(Map.of(
+            "sessionToken", initialSession.getSessionToken()
+        ));
+
+        // When
+        AuthSession refreshedSession = sessionManager.refreshSession(request);
+
+        // Then
         assertNotNull(refreshedSession);
         assertNotEquals(initialSession.getSessionToken(), refreshedSession.getSessionToken());
         assertEquals(TEST_DID, refreshedSession.getDID());
+        assertTrue(refreshedSession.getExpiresAt().isAfter(Instant.now()));
+    }
+
+    @Test
+    void testSessionRefreshWithExpiredToken() throws Exception {
+        // Given
+        AuthSession expiredSession = createTestSession();
+        expiredSession.setExpiresAt(Instant.now().minusSeconds(1));
+        when(request.getParams()).thenReturn(Map.of(
+            "sessionToken", expiredSession.getSessionToken()
+        ));
+
+        // When & Then
+        assertThrows(SecurityException.class, () ->
+            sessionManager.refreshSession(request)
+        );
+    }
+
+    @Test
+    void testSessionRefreshWithInvalidToken() {
+        // Given
+        when(request.getParams()).thenReturn(Map.of(
+            "sessionToken", "invalid-token"
+        ));
+
+        // When & Then
+        assertThrows(SecurityException.class, () ->
+            sessionManager.refreshSession(request)
+        );
     }
 
     @Test
     void testSessionInvalidation() throws Exception {
-        // Create initial session
-        AuthSession session = sessionManager.createSession(
-            TEST_DID,
-            TEST_PASSWORD,
-            TEST_PDS,
-            TEST_AUTH_FACTOR_TOKEN
-        );
+        // Given
+        AuthSession session = createTestSession();
+        when(request.getParams()).thenReturn(Map.of(
+            "sessionToken", session.getSessionToken()
+        ));
 
-        // Invalidate session
-        sessionManager.invalidateSession(session.getSessionToken());
+        // When
+        sessionManager.invalidateSession(request);
 
-        // Attempt to refresh should fail
+        // Then
         assertThrows(SecurityException.class, () ->
-            sessionManager.refreshSession(session.getSessionToken())
-        );
-    }
-
-    @Test
-    void testSessionExpiration() throws Exception {
-        // Create session with short expiration
-        AuthSession session = sessionManager.createSession(
-            TEST_DID,
-            TEST_PASSWORD,
-            TEST_PDS,
-            TEST_AUTH_FACTOR_TOKEN,
-            Instant.now().plusSeconds(1)
-        );
-
-        // Wait for expiration
-        Thread.sleep(2000);
-
-        // Attempt to refresh should fail
-        assertThrows(SecurityException.class, () ->
-            sessionManager.refreshSession(session.getSessionToken())
+            sessionManager.refreshSession(request)
         );
     }
 
     @Test
     void testSessionPersistence() throws Exception {
-        // Create session
-        AuthSession session = sessionManager.createSession(
+        // Given
+        AuthSession session = createTestSession();
+        when(request.getParams()).thenReturn(Map.of(
+            "sessionToken", session.getSessionToken()
+        ));
+
+        // When
+        sessionManager.persistSession(session);
+
+        // Then
+        AuthSession retrievedSession = sessionManager.loadSession(session.getSessionToken());
+        assertNotNull(retrievedSession);
+        assertEquals(session.getSessionToken(), retrievedSession.getSessionToken());
+        assertEquals(session.getDID(), retrievedSession.getDID());
+    }
+
+    @Test
+    void testSessionLoadingWithInvalidToken() {
+        // Given
+        when(request.getParams()).thenReturn(Map.of(
+            "sessionToken", "invalid-token"
+        ));
+
+        // When & Then
+        assertThrows(SecurityException.class, () ->
+            sessionManager.loadSession(request.getParams().get("sessionToken"))
+        );
+    }
+
+    @Test
+    void testSessionLoadingWithExpiredToken() throws Exception {
+        // Given
+        AuthSession expiredSession = createTestSession();
+        expiredSession.setExpiresAt(Instant.now().minusSeconds(1));
+        when(request.getParams()).thenReturn(Map.of(
+            "sessionToken", expiredSession.getSessionToken()
+        ));
+
+        // When & Then
+        assertThrows(SecurityException.class, () ->
+            sessionManager.loadSession(request.getParams().get("sessionToken"))
+        );
+    }
+
+    private AuthSession createTestSession() throws Exception {
+        return sessionManager.createSession(
             TEST_DID,
             TEST_PASSWORD,
             TEST_PDS,
             TEST_AUTH_FACTOR_TOKEN
         );
-
-        // Persist session
-        sessionManager.persistSession(session);
-
-        // Retrieve persisted session
-        AuthSession retrievedSession = sessionManager.loadSession(session.getSessionToken());
-
-        assertNotNull(retrievedSession);
-        assertEquals(session.getSessionToken(), retrievedSession.getSessionToken());
-        assertEquals(session.getDID(), retrievedSession.getDID());
     }
 }

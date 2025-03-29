@@ -7,12 +7,10 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
-import org.bouncycastle.jce.provider.BouncyCastleProvider;
 import org.junit.jupiter.api.Assertions;
 
 import java.security.KeyPair;
 import java.security.KeyPairGenerator;
-import java.security.Security;
 import java.time.Instant;
 
 @ExtendWith(MockitoExtension.class)
@@ -23,64 +21,92 @@ class JWTTokenTest {
 
     private static final String TEST_AUDIENCE = "test-audience";
     private static final String TEST_SUBJECT = "test-subject";
+    private static final String ACCESS_TOKEN_TYPE = "at+jwt";
+    private static final String REFRESH_TOKEN_TYPE = "refresh+jwt";
     private KeyPair keyPair;
 
     @BeforeEach
     void setUp() throws Exception {
-        Security.addProvider(new BouncyCastleProvider());
-        KeyPairGenerator generator = KeyPairGenerator.getInstance("Ed25519", "BC");
+        KeyPairGenerator generator = KeyPairGenerator.getInstance("RSA");
+        generator.initialize(2048);
         keyPair = generator.generateKeyPair();
     }
 
     @Test
-    void testTokenGenerationAndValidation() throws Exception {
+    void testAccessTokenGenerationAndValidation() throws Exception {
         String token = jwtService.generateToken(
             TEST_SUBJECT,
             TEST_AUDIENCE,
-            Instant.now().plusSeconds(3600),
-            keyPair.getPrivate()
+            Instant.now().plusMinutes(30), // Max 30 minutes for access tokens
+            keyPair.getPrivate(),
+            ACCESS_TOKEN_TYPE
         );
 
-        assertTrue(jwtService.validateToken(token, keyPair.getPublic()));
+        Assertions.assertTrue(jwtService.validateToken(token, keyPair.getPublic(), ACCESS_TOKEN_TYPE));
     }
 
     @Test
-    void testExpiredToken() throws Exception {
+    void testRefreshTokenGenerationAndValidation() throws Exception {
         String token = jwtService.generateToken(
             TEST_SUBJECT,
             TEST_AUDIENCE,
-            Instant.now().minusSeconds(1),
-            keyPair.getPrivate()
+            Instant.now().plusHours(24), // Max 24 hours for refresh tokens
+            keyPair.getPrivate(),
+            REFRESH_TOKEN_TYPE
         );
 
-        assertThrows(SecurityException.class, () ->
-            jwtService.validateToken(token, keyPair.getPublic())
+        Assertions.assertTrue(jwtService.validateToken(token, keyPair.getPublic(), REFRESH_TOKEN_TYPE));
+    }
+
+    @Test
+    void testTokenTypeValidation() throws Exception {
+        String accessToken = jwtService.generateToken(
+            TEST_SUBJECT,
+            TEST_AUDIENCE,
+            Instant.now().plusMinutes(30),
+            keyPair.getPrivate(),
+            ACCESS_TOKEN_TYPE
+        );
+
+        // Should fail if token type doesn't match
+        Assertions.assertThrows(SecurityException.class, () ->
+            jwtService.validateToken(accessToken, keyPair.getPublic(), REFRESH_TOKEN_TYPE)
         );
     }
 
     @Test
-    void testInvalidSignature() throws Exception {
+    void testTokenLifetimeValidation() throws Exception {
+        // Test access token with too long lifetime
+        String longLivedToken = jwtService.generateToken(
+            TEST_SUBJECT,
+            TEST_AUDIENCE,
+            Instant.now().plusHours(1), // 1 hour > 30 minutes
+            keyPair.getPrivate(),
+            ACCESS_TOKEN_TYPE
+        );
+
+        Assertions.assertThrows(SecurityException.class, () ->
+            jwtService.validateToken(longLivedToken, keyPair.getPublic(), ACCESS_TOKEN_TYPE)
+        );
+    }
+
+    @Test
+    void testTokenBindingToDPoPKey() throws Exception {
         String token = jwtService.generateToken(
             TEST_SUBJECT,
             TEST_AUDIENCE,
-            Instant.now().plusSeconds(3600),
-            keyPair.getPrivate()
+            Instant.now().plusMinutes(30),
+            keyPair.getPrivate(),
+            ACCESS_TOKEN_TYPE
         );
 
-        // Create a different key pair to simulate invalid signature
-        KeyPairGenerator generator = KeyPairGenerator.getInstance("Ed25519", "BC");
-        KeyPair invalidKeyPair = generator.generateKeyPair();
+        // Create a different key pair to simulate different DPoP key
+        KeyPairGenerator generator = KeyPairGenerator.getInstance("RSA");
+        generator.initialize(2048);
+        KeyPair differentKeyPair = generator.generateKeyPair();
 
-        assertThrows(SecurityException.class, () ->
-            jwtService.validateToken(token, invalidKeyPair.getPublic())
-        );
-    }
-
-    @Test
-    void testInvalidTokenFormat() {
-        String invalidToken = "invalid.token.format";
-        assertThrows(SecurityException.class, () ->
-            jwtService.validateToken(invalidToken, keyPair.getPublic())
+        Assertions.assertThrows(SecurityException.class, () ->
+            jwtService.validateToken(token, differentKeyPair.getPublic(), ACCESS_TOKEN_TYPE)
         );
     }
 
@@ -89,12 +115,36 @@ class JWTTokenTest {
         String token = jwtService.generateToken(
             TEST_SUBJECT,
             TEST_AUDIENCE,
-            Instant.now().plusSeconds(3600),
-            keyPair.getPrivate()
+            Instant.now().plusMinutes(30),
+            keyPair.getPrivate(),
+            ACCESS_TOKEN_TYPE
         );
 
-        assertThrows(SecurityException.class, () ->
-            jwtService.validateToken(token, keyPair.getPublic(), "different-audience")
+        Assertions.assertThrows(SecurityException.class, () ->
+            jwtService.validateToken(token, keyPair.getPublic(), ACCESS_TOKEN_TYPE, "different-audience")
+        );
+    }
+
+    @Test
+    void testTokenSubjectValidation() throws Exception {
+        String token = jwtService.generateToken(
+            TEST_SUBJECT,
+            TEST_AUDIENCE,
+            Instant.now().plusMinutes(30),
+            keyPair.getPrivate(),
+            ACCESS_TOKEN_TYPE
+        );
+
+        Assertions.assertThrows(SecurityException.class, () ->
+            jwtService.validateToken(token, keyPair.getPublic(), ACCESS_TOKEN_TYPE, TEST_AUDIENCE, "different-subject")
+        );
+    }
+
+    @Test
+    void testInvalidTokenFormat() {
+        String invalidToken = "invalid.token.format";
+        Assertions.assertThrows(SecurityException.class, () ->
+            jwtService.validateToken(invalidToken, keyPair.getPublic(), ACCESS_TOKEN_TYPE)
         );
     }
 }

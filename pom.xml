@@ -17,28 +17,11 @@
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
         <maven.compiler.source>21</maven.compiler.source>
         <maven.compiler.target>21</maven.compiler.target>
-        <junit.version>5.13.0-M1</junit.version>  <!-- Use a stable JUnit 5 release -->
-        <mockito.version>5.16.1</mockito.version> <!--  Use latest stable Mockito version -->
+        <junit.version>5.13.0-M1</junit.version>
+        <mockito.version>5.16.1</mockito.version>
     </properties>
 
     <dependencies>
-        <!-- Jackson Core Dependencies -->
-        <dependency>
-            <groupId>com.fasterxml.jackson.core</groupId>
-            <artifactId>jackson-core</artifactId>
-            <version>2.16.1</version>
-        </dependency>
-        <dependency>
-            <groupId>com.fasterxml.jackson.core</groupId>
-            <artifactId>jackson-annotations</artifactId>
-            <version>2.16.1</version>
-        </dependency>
-        <dependency>
-            <groupId>com.fasterxml.jackson.core</groupId>
-            <artifactId>jackson-databind</artifactId>
-            <version>2.16.1</version>
-        </dependency>
-        
         <!-- JUnit 5 for testing -->
         <dependency>
             <groupId>org.junit.jupiter</groupId>
@@ -58,6 +41,7 @@
             <version>${junit.version}</version>
             <scope>test</scope>
         </dependency>
+
         <!-- Mockito for mocking -->
         <dependency>
             <groupId>org.mockito</groupId>
@@ -65,20 +49,7 @@
             <version>${mockito.version}</version>
             <scope>test</scope>
         </dependency>
-        <!-- Apache Commons for utility functions -->
-        <dependency>
-            <groupId>org.apache.commons</groupId>
-            <artifactId>commons-lang3</artifactId>
-            <version>3.14.0</version>
-            <scope>test</scope>
-        </dependency>
-        <!-- SLF4J for logging -->
-        <dependency>
-            <groupId>org.slf4j</groupId>
-            <artifactId>slf4j-api</artifactId>
-            <version>2.0.12</version>
-            <scope>test</scope>
-        </dependency>
+
         <!-- AssertJ for better assertions -->
         <dependency>
             <groupId>org.assertj</groupId>
@@ -86,14 +57,8 @@
             <version>3.25.3</version>
             <scope>test</scope>
         </dependency>
-        <!-- WireMock for HTTP mocking -->
-        <dependency>
-            <groupId>com.github.tomakehurst</groupId>
-            <artifactId>wiremock-jre8</artifactId>
-            <version>2.35.0</version>
-            <scope>test</scope>
-        </dependency>
-        <!-- OWASP Security Testing Libraries -->
+
+        <!-- Security Testing Dependencies -->
         <dependency>
             <groupId>org.owasp</groupId>
             <artifactId>dependency-check-core</artifactId>
@@ -102,100 +67,8 @@
         </dependency>
         <dependency>
             <groupId>org.owasp</groupId>
-            <artifactId>dependency-check-ant</artifactId>
-            <version>8.5.0</version>
-            <scope>test</scope>
-        </dependency>
-        <dependency>
-            <groupId>org.owasp</groupId>
-            <artifactId>dependency-check-maven</artifactId>
-            <version>8.5.0</version>
-            <scope>test</scope>
-        </dependency>
-        <dependency>
-            <groupId>org.owasp</groupId>
-            <artifactId>dependency-check-jsp</artifactId>
-            <version>8.5.0</version>
-            <scope>test</scope>
-        </dependency>
-        <dependency>
-            <groupId>org.owasp</groupId>
             <artifactId>dependency-check-utils</artifactId>
             <version>8.5.0</version>
-            <scope>test</scope>
-        </dependency>
-        <!-- Security Testing Utilities -->
-        <dependency>
-            <groupId>org.zaproxy</groupId>
-            <artifactId>zap-clientapi</artifactId>
-            <version>1.10.0</version>
-            <scope>test</scope>
-        </dependency>
-        <dependency>
-            <groupId>org.bouncycastle</groupId>
-            <artifactId>bcprov-jdk18on</artifactId>
-            <version>1.76</version>
-            <scope>test</scope>
-        </dependency>
-        <dependency>
-            <groupId>org.bouncycastle</groupId>
-            <artifactId>bcpkix-jdk18on</artifactId>
-            <version>1.76</version>
-            <scope>test</scope>
-        </dependency>
-        <!-- Security Testing Dependencies -->
-        <dependency>
-            <groupId>org.junit.jupiter</groupId>
-            <artifactId>junit-jupiter-params</artifactId>
-            <version>${junit.version}</version>
-            <scope>test</scope>
-        </dependency>
-        <dependency>
-            <groupId>org.junit.jupiter</groupId>
-            <artifactId>junit-jupiter-engine</artifactId>
-            <version>${junit.version}</version>
-            <scope>test</scope>
-        </dependency>
-        <dependency>
-            <groupId>org.mockito</groupId>
-            <artifactId>mockito-core</artifactId>
-            <version>${mockito.version}</version>
-            <scope>test</scope>
-        </dependency>
-        <dependency>
-            <groupId>org.mockito</groupId>
-            <artifactId>mockito-junit-jupiter</artifactId>
-            <version>${mockito.version}</version>
-            <scope>test</scope>
-        </dependency>
-        <dependency>
-            <groupId>org.assertj</groupId>
-            <artifactId>assertj-core</artifactId>
-            <version>3.25.3</version>
-            <scope>test</scope>
-        </dependency>
-        <dependency>
-            <groupId>org.awaitility</groupId>
-            <artifactId>awaitility</artifactId>
-            <version>4.2.0</version>
-            <scope>test</scope>
-        </dependency>
-        <dependency>
-            <groupId>org.testcontainers</groupId>
-            <artifactId>testcontainers</artifactId>
-            <version>1.19.3</version>
-            <scope>test</scope>
-        </dependency>
-        <dependency>
-            <groupId>org.testcontainers</groupId>
-            <artifactId>junit-jupiter</artifactId>
-            <version>1.19.3</version>
-            <scope>test</scope>
-        </dependency>
-        <dependency>
-            <groupId>org.testcontainers</groupId>
-            <artifactId>postgresql</artifactId>
-            <version>1.19.3</version>
             <scope>test</scope>
         </dependency>
     </dependencies>
@@ -210,66 +83,8 @@
                 <configuration>
                     <source>${maven.compiler.source}</source>
                     <target>${maven.compiler.target}</target>
-                    <release>21</release>
                 </configuration>
             </plugin>
-
-            <!-- Maven Surefire Plugin (for running tests) -->
-            <plugin>
-                <groupId>org.apache.maven.plugins</groupId>
-                <artifactId>maven-surefire-plugin</artifactId>
-                <version>3.2.5</version> <!-- Use a recent, compatible version -->
-            </plugin>
-
-            <!-- Maven Jar Plugin (for building the JAR) -->
-            <plugin>
-                <groupId>org.apache.maven.plugins</groupId>
-                <artifactId>maven-jar-plugin</artifactId>
-                <version>3.3.0</version>
-               <configuration>
-                    <archive>
-                      <manifest>
-                        <!--  Optionally add a Main-Class if you have an executable entry point -->
-                        <!-- <mainClass>com.atproto.Main</mainClass>  -->
-                      </manifest>
-                    </archive>
-                </configuration>
-            </plugin>
-
-            <!-- Maven Javadoc Plugin (for generating Javadoc) -->
-            <plugin>
-                <groupId>org.apache.maven.plugins</groupId>
-                <artifactId>maven-javadoc-plugin</artifactId>
-                <version>3.6.3</version>
-                <configuration>
-                    <source>21</source> <!--  Ensure javadoc is generated for Java 21 -->
-                    <doclint>none</doclint> <!-- Add this, otherwise javadoc generation will fail-->
-                </configuration>
-                <executions>
-                    <execution>
-                        <id>attach-javadocs</id>
-                        <goals>
-                            <goal>jar</goal>
-                        </goals>
-                    </execution>
-                </executions>
-            </plugin>
-
-              <!-- Maven Source Plugin (for generating source JAR) -->
-             <plugin>
-                <groupId>org.apache.maven.plugins</groupId>
-                <artifactId>maven-source-plugin</artifactId>
-                <version>3.3.0</version>
-                <executions>
-                    <execution>
-                        <id>attach-sources</id>
-                        <goals>
-                            <goal>jar</goal>
-                        </goals>
-                    </execution>
-                </executions>
-            </plugin>
-
         </plugins>
     </build>
 </project>

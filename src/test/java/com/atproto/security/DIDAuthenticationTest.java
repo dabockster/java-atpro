@@ -8,8 +8,7 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
-import org.owasp.dependencycheck.utils.StringUtils;
-
+import java.util.Arrays;
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.when;
@@ -62,7 +61,7 @@ class DIDAuthenticationTest {
     private DIDDocument createValidDIDDocument() {
         return DIDDocument.builder()
             .id(VALID_DID)
-            .verificationMethod(List.of(
+            .verificationMethod(Arrays.asList(
                 VerificationMethod.builder()
                     .id("#key-1")
                     .type("Ed25519VerificationKey2020")
@@ -70,7 +69,7 @@ class DIDAuthenticationTest {
                     .publicKeyMultibase("z6MkghvUk5NR6F3kq25mhbhVUUK7P8Hj9jUfyw4QL1Uejot")
                     .build()
             ))
-            .authentication(List.of("#key-1"))
+            .authentication(Arrays.asList("#key-1"))
             .build();
     }
 }

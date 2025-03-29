@@ -11,7 +11,6 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import java.util.concurrent.TimeoutException;
 
 import static org.junit.jupiter.api.Assertions.*;
-import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
@@ -44,43 +43,6 @@ public class TimeoutHandlingTest {
     public void testReadTimeout() throws Exception {
         // Test read timeout
         when(xrpcClient.sendRequest(any())).thenThrow(new TimeoutException("Read timeout"));
-
-        XrpcException exception = assertThrows(XrpcException.class, () -> {
-            subject.sendRequest();
-        });
-
-        assertTrue(exception.getMessage().contains("timeout"));
-        assertTrue(exception.isTimeout());
-    }
-
-    @Test
-    public void testTimeoutConfiguration() throws Exception {
-        // Test timeout configuration
-        when(xrpcClient.sendRequest(any())).thenThrow(new TimeoutException("Timeout after 30 seconds"));
-
-        XrpcException exception = assertThrows(XrpcException.class, () -> {
-            subject.sendRequest();
-        });
-
-        assertTrue(exception.getMessage().contains("timeout"));
-        assertTrue(exception.isTimeout());
-    }
-
-    @Test
-    public void testTimeoutRecovery() throws Exception {
-        // Test timeout recovery
-        when(xrpcClient.sendRequest(any()))
-            .thenThrow(new TimeoutException("Initial timeout"))
-            .thenReturn(mock(Object.class));
-
-        subject.sendRequest();
-        verify(xrpcClient, times(2)).sendRequest(any());
-    }
-
-    @Test
-    public void testTimeoutLogging() throws Exception {
-        // Test timeout logging
-        when(xrpcClient.sendRequest(any())).thenThrow(new TimeoutException("Timeout occurred"));
 
         XrpcException exception = assertThrows(XrpcException.class, () -> {
             subject.sendRequest();

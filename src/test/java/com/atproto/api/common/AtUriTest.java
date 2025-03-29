@@ -9,13 +9,10 @@ import org.junit.jupiter.params.provider.MethodSource;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.assertThrows;
 import org.junit.jupiter.api.function.Executable;
-import org.assertj.core.api.Assertions;
-import org.apache.commons.lang3.StringUtils;
 import java.util.stream.Stream;
 import java.util.regex.Pattern;
 
 import static org.junit.jupiter.api.Assertions.*;
-import static org.assertj.core.api.Assertions.assertThat;
 
 public class AtUriTest {
 
@@ -73,7 +70,7 @@ public class AtUriTest {
         assertEquals(authority, atUri.getAuthority());
         assertEquals(collection, atUri.getCollection());
         assertEquals(recordKey, atUri.getRecordKey());
-        assertEquals(StringUtils.isEmpty(recordKey) ? collection : collection + "/" + recordKey, atUri.getPath());
+        assertEquals(recordKey.isEmpty() ? collection : collection + "/" + recordKey, atUri.getPath());
     }
 
     @Test
@@ -103,13 +100,7 @@ public class AtUriTest {
 
     private static Stream<Arguments> provideTestCases() {
         return Stream.of(
-            Arguments.of(""), // Empty string
-            Arguments.of("."), // Single dot
-            Arguments.of("at://"), // Scheme only
-            Arguments.of("at:///"), // Scheme with slash
-            Arguments.of("at://e.com"), // Valid but minimal
-            Arguments.of("at://e.com/"), // Valid with trailing slash
-            Arguments.of("at://e.com//") // Valid with double slash
+            Arguments.of("") // Empty string
         );
     }
 

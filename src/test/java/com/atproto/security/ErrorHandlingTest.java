@@ -1,8 +1,12 @@
 package com.atproto.security;
 
 import com.atproto.api.xrpc.XrpcRequest;
-import com.atproto.api.xrpc.XrpcResponse;
-import com.atproto.api.xrpc.errors.*;
+import com.atproto.api.xrpc.errors.UnsupportedDomainError;
+import com.atproto.api.xrpc.errors.InvalidHandleError;
+import com.atproto.api.xrpc.errors.EmailValidationError;
+import com.atproto.api.xrpc.errors.PasswordStrengthError;
+import com.atproto.api.xrpc.errors.RateLimitError;
+import com.atproto.api.xrpc.errors.AuthenticationError;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -10,7 +14,7 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
-import java.util.UUID;
+import java.util.Map;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.any;

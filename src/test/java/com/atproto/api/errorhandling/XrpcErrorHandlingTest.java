@@ -2,7 +2,6 @@ package com.atproto.api.errorhandling;
 
 import com.atproto.api.xrpc.XrpcClient;
 import com.atproto.api.xrpc.XrpcException;
-import com.atproto.api.xrpc.XrpcResponse;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -22,23 +21,24 @@ public class XrpcErrorHandlingTest {
     @Mock
     private XrpcClient xrpcClient;
 
-    private XrpcErrorHandlingTest subject;
+    private XrpcErrorHandling errorHandling;
 
     @BeforeEach
     public void setUp() {
-        subject = new XrpcErrorHandlingTest();
+        errorHandling = new XrpcErrorHandling(xrpcClient);
     }
 
     @Test
-    public void testXrpcErrorResponse() throws Exception {
-        // Test error response with code and message
+    public void shouldHandleNotFoundErrorResponse() throws Exception {
+        // Given
         String errorJson = "{\"error\":\"not_found\",\"message\":\"Resource not found\"}";
         HttpResponse<String> response = mock(HttpResponse.class);
         when(response.statusCode()).thenReturn(404);
         when(response.body()).thenReturn(errorJson);
 
+        // When & Then
         XrpcException exception = assertThrows(XrpcException.class, () -> {
-            subject.handleXrpcResponse(response);
+            errorHandling.handleResponse(response);
         });
 
         assertEquals(404, exception.getStatusCode());
@@ -47,12 +47,14 @@ public class XrpcErrorHandlingTest {
     }
 
     @Test
-    public void testNetworkError() throws Exception {
-        // Test network error handling
-        when(xrpcClient.sendRequest(any())).thenThrow(new RuntimeException("Network error"));
+    public void shouldHandleNetworkError() throws Exception {
+        // Given
+        RuntimeException networkError = new RuntimeException("Network error");
+        when(xrpcClient.sendRequest(any())).thenThrow(networkError);
 
+        // When & Then
         XrpcException exception = assertThrows(XrpcException.class, () -> {
-            subject.sendRequest();
+            errorHandling.sendRequest();
         });
 
         assertTrue(exception.getMessage().contains("Network error"));
@@ -60,12 +62,14 @@ public class XrpcErrorHandlingTest {
     }
 
     @Test
-    public void testTimeoutError() throws Exception {
-        // Test timeout handling
-        when(xrpcClient.sendRequest(any())).thenThrow(new TimeoutException("Request timed out"));
+    public void shouldHandleTimeoutError() throws Exception {
+        // Given
+        TimeoutException timeoutError = new TimeoutException("Request timed out");
+        when(xrpcClient.sendRequest(any())).thenThrow(timeoutError);
 
+        // When & Then
         XrpcException exception = assertThrows(XrpcException.class, () -> {
-            subject.sendRequest();
+            errorHandling.sendRequest();
         });
 
         assertTrue(exception.getMessage().contains("timeout"));
@@ -73,15 +77,16 @@ public class XrpcErrorHandlingTest {
     }
 
     @Test
-    public void testValidationErrorResponse() throws Exception {
-        // Test validation error response
+    public void shouldHandleValidationError() throws Exception {
+        // Given
         String errorJson = "{\"error\":\"invalid_request\",\"message\":\"Invalid parameter: value must be a string\"}";
         HttpResponse<String> response = mock(HttpResponse.class);
         when(response.statusCode()).thenReturn(400);
         when(response.body()).thenReturn(errorJson);
 
+        // When & Then
         XrpcException exception = assertThrows(XrpcException.class, () -> {
-            subject.handleXrpcResponse(response);
+            errorHandling.handleResponse(response);
         });
 
         assertEquals(400, exception.getStatusCode());
@@ -90,15 +95,16 @@ public class XrpcErrorHandlingTest {
     }
 
     @Test
-    public void testMultipleErrorResponses() throws Exception {
-        // Test handling multiple errors in a single response
+    public void shouldHandleMultipleErrors() throws Exception {
+        // Given
         String errorJson = "{\"error\":\"validation_error\",\"message\":\"Multiple validation errors\",\"details\":[\"Field1 is required\",\"Field2 must be numeric\"]}";
         HttpResponse<String> response = mock(HttpResponse.class);
         when(response.statusCode()).thenReturn(400);
         when(response.body()).thenReturn(errorJson);
 
+        // When & Then
         XrpcException exception = assertThrows(XrpcException.class, () -> {
-            subject.handleXrpcResponse(response);
+            errorHandling.handleResponse(response);
         });
 
         assertEquals(400, exception.getStatusCode());
@@ -109,15 +115,16 @@ public class XrpcErrorHandlingTest {
     }
 
     @Test
-    public void testRateLimitingError() throws Exception {
-        // Test rate limiting error (429)
+    public void shouldHandleRateLimiting() throws Exception {
+        // Given
         String errorJson = "{\"error\":\"rate_limit_exceeded\",\"message\":\"Rate limit exceeded\",\"retry_after\":30}";
         HttpResponse<String> response = mock(HttpResponse.class);
         when(response.statusCode()).thenReturn(429);
         when(response.body()).thenReturn(errorJson);
 
+        // When & Then
         XrpcException exception = assertThrows(XrpcException.class, () -> {
-            subject.handleXrpcResponse(response);
+            errorHandling.handleResponse(response);
         });
 
         assertEquals(429, exception.getStatusCode());
@@ -127,15 +134,16 @@ public class XrpcErrorHandlingTest {
     }
 
     @Test
-    public void testAuthenticationError() throws Exception {
-        // Test authentication error (401/403)
+    public void shouldHandleAuthenticationError() throws Exception {
+        // Given
         String errorJson = "{\"error\":\"unauthorized\",\"message\":\"Invalid credentials\"}";
         HttpResponse<String> response = mock(HttpResponse.class);
         when(response.statusCode()).thenReturn(401);
         when(response.body()).thenReturn(errorJson);
 
+        // When & Then
         XrpcException exception = assertThrows(XrpcException.class, () -> {
-            subject.handleXrpcResponse(response);
+            errorHandling.handleResponse(response);
         });
 
         assertEquals(401, exception.getStatusCode());
@@ -144,15 +152,16 @@ public class XrpcErrorHandlingTest {
     }
 
     @Test
-    public void testServerError() throws Exception {
-        // Test server error (500+)
+    public void shouldHandleServerError() throws Exception {
+        // Given
         String errorJson = "{\"error\":\"internal_error\",\"message\":\"Server encountered an error\"}";
         HttpResponse<String> response = mock(HttpResponse.class);
         when(response.statusCode()).thenReturn(500);
         when(response.body()).thenReturn(errorJson);
 
+        // When & Then
         XrpcException exception = assertThrows(XrpcException.class, () -> {
-            subject.handleXrpcResponse(response);
+            errorHandling.handleResponse(response);
         });
 
         assertEquals(500, exception.getStatusCode());
@@ -161,27 +170,19 @@ public class XrpcErrorHandlingTest {
     }
 
     @Test
-    public void testMalformedResponse() throws Exception {
-        // Test handling of malformed response
+    public void shouldHandleMalformedResponse() throws Exception {
+        // Given
         String malformedJson = "{\"error\":\"invalid_json\",\"message\":Invalid JSON""";
         HttpResponse<String> response = mock(HttpResponse.class);
         when(response.statusCode()).thenReturn(400);
         when(response.body()).thenReturn(malformedJson);
 
+        // When & Then
         XrpcException exception = assertThrows(XrpcException.class, () -> {
-            subject.handleXrpcResponse(response);
+            errorHandling.handleResponse(response);
         });
 
         assertEquals(400, exception.getStatusCode());
         assertTrue(exception.getMessage().contains("Invalid JSON"));
-    }
-
-    // Helper methods for testing
-    private void handleXrpcResponse(HttpResponse<String> response) throws Exception {
-        // Implementation would handle the response and throw appropriate exceptions
-    }
-
-    private void sendRequest() throws Exception {
-        // Implementation would send the request and handle errors
     }
 }
