@@ -21,6 +21,19 @@
         <mockito.version>5.16.1</mockito.version>
     </properties>
 
+    <repositories>
+        <repository>
+            <id>central</id>
+            <url>https://repo.maven.apache.org/maven2</url>
+            <releases>
+                <enabled>true</enabled>
+            </releases>
+            <snapshots>
+                <enabled>false</enabled>
+            </snapshots>
+        </repository>
+    </repositories>
+
     <dependencies>
         <!-- JUnit 5 for testing -->
         <dependency>
@@ -72,6 +85,20 @@
             <scope>test</scope>
         </dependency>
 
+        <!-- JMH for performance benchmarking -->
+        <dependency>
+            <groupId>org.openjdk.jmh</groupId>
+            <artifactId>jmh-core</artifactId>
+            <version>1.38</version>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.openjdk.jmh</groupId>
+            <artifactId>jmh-generator-annprocess</artifactId>
+            <version>1.38</version>
+            <scope>test</scope>
+        </dependency>
+
         <!-- Security Testing Dependencies -->
         <dependency>
             <groupId>org.owasp</groupId>
@@ -99,6 +126,30 @@
                     <target>${maven.compiler.target}</target>
                 </configuration>
             </plugin>
+
+            <!-- JMH Plugin -->
+            <plugin>
+                <groupId>org.openjdk.jmh</groupId>
+                <artifactId>jmh-maven-plugin</artifactId>
+                <version>1.38</version>
+                <executions>
+                    <execution>
+                        <goals>
+                            <goal>jmh</goal>
+                        </goals>
+                    </execution>
+                </executions>
+                <configuration>
+                    <includes>
+                        <include>.*Test.*</include>
+                    </includes>
+                    <forks>1</forks>
+                    <warmupIterations>5</warmupIterations>
+                    <measurementIterations>10</measurementIterations>
+                    <threads>4</threads>
+                </configuration>
+            </plugin>
+
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-surefire-plugin</artifactId>
