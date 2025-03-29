@@ -4,12 +4,15 @@ import com.atproto.did.DIDResolver;
 import com.atproto.did.DIDDocument;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import java.util.Arrays;
-import static org.junit.jupiter.api.Assertions.*;
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.when;
 
@@ -32,30 +35,39 @@ class DIDAuthenticationTest {
         when(didResolver.resolveDID(INVALID_DID)).thenReturn(null);
     }
 
-    @Test
-    void testValidDIDAuthentication() {
-        assertTrue(authenticationService.authenticateDID(VALID_DID));
+    @ParameterizedTest
+    @ValueSource(strings = {"did:plc:1234567890abcdef", "did:web:example.com"})
+    void testValidDIDAuthentication(String validDid) {
+        when(didResolver.resolveDID(validDid)).thenReturn(createValidDIDDocument());
+        assertThat(authenticationService.authenticateDID(validDid)).isTrue();
     }
 
-    @Test
-    void testInvalidDIDAuthentication() {
+    @ParameterizedTest
+    @ValueSource(strings = {"invalid-did", "did:plc:invalid", "did:web:"})
+    void testInvalidDIDAuthentication(String invalidDid) {
         assertThrows(IllegalArgumentException.class, () -> 
-            authenticationService.authenticateDID(INVALID_DID)
+            authenticationService.authenticateDID(invalidDid)
         );
     }
 
-    @Test
-    void testDIDFormatValidation() {
-        assertFalse(authenticationService.validateDIDFormat(INVALID_DID));
-        assertTrue(authenticationService.validateDIDFormat(VALID_DID));
+    @ParameterizedTest
+    @ValueSource(strings = {"did:plc:1234567890abcdef", "did:web:example.com"})
+    void testDIDFormatValidation(String validDid) {
+        assertThat(authenticationService.validateDIDFormat(validDid)).isTrue();
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"invalid-did", "did:plc:invalid", "did:web:"})
+    void testDIDFormatValidationFailure(String invalidDid) {
+        assertThat(authenticationService.validateDIDFormat(invalidDid)).isFalse();
     }
 
     @Test
     void testDIDResolutionFailure() {
         when(didResolver.resolveDID(VALID_DID)).thenThrow(new RuntimeException("Resolution failed"));
-        assertThrows(RuntimeException.class, () -> 
-            authenticationService.authenticateDID(VALID_DID)
-        );
+        assertThatThrownBy(() -> authenticationService.authenticateDID(VALID_DID))
+            .isInstanceOf(RuntimeException.class)
+            .hasMessage("Resolution failed");
     }
 
     private DIDDocument createValidDIDDocument() {

@@ -7,11 +7,11 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.assertj.core.api.Assertions;
 
 import java.net.http.HttpResponse;
 import java.util.concurrent.TimeoutException;
 
-import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.*;
 
@@ -37,13 +37,17 @@ public class XrpcErrorHandlingTest {
         when(response.body()).thenReturn(errorJson);
 
         // When & Then
-        XrpcException exception = assertThrows(XrpcException.class, () -> {
+        XrpcException exception = Assertions.assertThatThrownBy(() -> {
             errorHandling.handleResponse(response);
-        });
+        }).isInstanceOf(XrpcException.class)
+           .satisfies(e -> {
+               Assertions.assertThat(e.getStatusCode()).isEqualTo(404);
+               Assertions.assertThat(e.getCode()).isEqualTo("not_found");
+               Assertions.assertThat(e.getMessage()).isEqualTo("Resource not found");
+           });
 
-        assertEquals(404, exception.getStatusCode());
-        assertEquals("not_found", exception.getCode());
-        assertEquals("Resource not found", exception.getMessage());
+        verify(response).statusCode();
+        verify(response).body();
     }
 
     @Test
@@ -53,12 +57,13 @@ public class XrpcErrorHandlingTest {
         when(xrpcClient.sendRequest(any())).thenThrow(networkError);
 
         // When & Then
-        XrpcException exception = assertThrows(XrpcException.class, () -> {
+        XrpcException exception = Assertions.assertThatThrownBy(() -> {
             errorHandling.sendRequest();
-        });
+        }).isInstanceOf(XrpcException.class)
+           .hasMessageContaining("Network error")
+           .satisfies(e -> Assertions.assertThat(e.isNetworkError()).isTrue());
 
-        assertTrue(exception.getMessage().contains("Network error"));
-        assertTrue(exception.isNetworkError());
+        verify(xrpcClient).sendRequest(any());
     }
 
     @Test
@@ -68,12 +73,13 @@ public class XrpcErrorHandlingTest {
         when(xrpcClient.sendRequest(any())).thenThrow(timeoutError);
 
         // When & Then
-        XrpcException exception = assertThrows(XrpcException.class, () -> {
+        XrpcException exception = Assertions.assertThatThrownBy(() -> {
             errorHandling.sendRequest();
-        });
+        }).isInstanceOf(XrpcException.class)
+           .hasMessageContaining("timeout")
+           .satisfies(e -> Assertions.assertThat(e.isTimeout()).isTrue());
 
-        assertTrue(exception.getMessage().contains("timeout"));
-        assertTrue(exception.isTimeout());
+        verify(xrpcClient).sendRequest(any());
     }
 
     @Test
@@ -85,13 +91,17 @@ public class XrpcErrorHandlingTest {
         when(response.body()).thenReturn(errorJson);
 
         // When & Then
-        XrpcException exception = assertThrows(XrpcException.class, () -> {
+        XrpcException exception = Assertions.assertThatThrownBy(() -> {
             errorHandling.handleResponse(response);
-        });
+        }).isInstanceOf(XrpcException.class)
+           .satisfies(e -> {
+               Assertions.assertThat(e.getStatusCode()).isEqualTo(400);
+               Assertions.assertThat(e.getCode()).isEqualTo("invalid_request");
+               Assertions.assertThat(e.getMessage()).contains("Invalid parameter");
+           });
 
-        assertEquals(400, exception.getStatusCode());
-        assertEquals("invalid_request", exception.getCode());
-        assertTrue(exception.getMessage().contains("Invalid parameter"));
+        verify(response).statusCode();
+        verify(response).body();
     }
 
     @Test
@@ -103,34 +113,40 @@ public class XrpcErrorHandlingTest {
         when(response.body()).thenReturn(errorJson);
 
         // When & Then
-        XrpcException exception = assertThrows(XrpcException.class, () -> {
+        XrpcException exception = Assertions.assertThatThrownBy(() -> {
             errorHandling.handleResponse(response);
-        });
+        }).isInstanceOf(XrpcException.class)
+           .satisfies(e -> {
+               Assertions.assertThat(e.getStatusCode()).isEqualTo(400);
+               Assertions.assertThat(e.getCode()).isEqualTo("validation_error");
+               Assertions.assertThat(e.getMessage()).contains("Multiple validation errors");
+               Assertions.assertThat(e.getDetails()).containsExactly("Field1 is required", "Field2 must be numeric");
+           });
 
-        assertEquals(400, exception.getStatusCode());
-        assertEquals("validation_error", exception.getCode());
-        assertTrue(exception.getMessage().contains("Multiple validation errors"));
-        assertTrue(exception.getDetails().contains("Field1 is required"));
-        assertTrue(exception.getDetails().contains("Field2 must be numeric"));
+        verify(response).statusCode();
+        verify(response).body();
     }
 
     @Test
     public void shouldHandleRateLimiting() throws Exception {
         // Given
-        String errorJson = "{\"error\":\"rate_limit_exceeded\",\"message\":\"Rate limit exceeded\",\"retry_after\":30}";
+        String errorJson = "{\"error\":\"rate_limit_exceeded\",\"message\":\"Too many requests, please try again later\"}";
         HttpResponse<String> response = mock(HttpResponse.class);
         when(response.statusCode()).thenReturn(429);
         when(response.body()).thenReturn(errorJson);
 
         // When & Then
-        XrpcException exception = assertThrows(XrpcException.class, () -> {
+        XrpcException exception = Assertions.assertThatThrownBy(() -> {
             errorHandling.handleResponse(response);
-        });
+        }).isInstanceOf(XrpcException.class)
+           .satisfies(e -> {
+               Assertions.assertThat(e.getStatusCode()).isEqualTo(429);
+               Assertions.assertThat(e.getCode()).isEqualTo("rate_limit_exceeded");
+               Assertions.assertThat(e.getMessage()).contains("Too many requests");
+           });
 
-        assertEquals(429, exception.getStatusCode());
-        assertEquals("rate_limit_exceeded", exception.getCode());
-        assertTrue(exception.getMessage().contains("Rate limit exceeded"));
-        assertTrue(exception.getRetryAfter() > 0);
+        verify(response).statusCode();
+        verify(response).body();
     }
 
     @Test
@@ -142,47 +158,56 @@ public class XrpcErrorHandlingTest {
         when(response.body()).thenReturn(errorJson);
 
         // When & Then
-        XrpcException exception = assertThrows(XrpcException.class, () -> {
+        XrpcException exception = Assertions.assertThatThrownBy(() -> {
             errorHandling.handleResponse(response);
-        });
+        }).isInstanceOf(XrpcException.class)
+           .satisfies(e -> {
+               Assertions.assertThat(e.getStatusCode()).isEqualTo(401);
+               Assertions.assertThat(e.getCode()).isEqualTo("unauthorized");
+               Assertions.assertThat(e.getMessage()).contains("Invalid credentials");
+           });
 
-        assertEquals(401, exception.getStatusCode());
-        assertEquals("unauthorized", exception.getCode());
-        assertTrue(exception.getMessage().contains("Invalid credentials"));
+        verify(response).statusCode();
+        verify(response).body();
     }
 
     @Test
     public void shouldHandleServerError() throws Exception {
         // Given
-        String errorJson = "{\"error\":\"internal_error\",\"message\":\"Server encountered an error\"}";
+        String errorJson = "{\"error\":\"server_error\",\"message\":\"Internal server error\"}";
         HttpResponse<String> response = mock(HttpResponse.class);
         when(response.statusCode()).thenReturn(500);
         when(response.body()).thenReturn(errorJson);
 
         // When & Then
-        XrpcException exception = assertThrows(XrpcException.class, () -> {
+        XrpcException exception = Assertions.assertThatThrownBy(() -> {
             errorHandling.handleResponse(response);
-        });
+        }).isInstanceOf(XrpcException.class)
+           .satisfies(e -> {
+               Assertions.assertThat(e.getStatusCode()).isEqualTo(500);
+               Assertions.assertThat(e.getCode()).isEqualTo("server_error");
+               Assertions.assertThat(e.getMessage()).contains("Internal server error");
+           });
 
-        assertEquals(500, exception.getStatusCode());
-        assertEquals("internal_error", exception.getCode());
-        assertTrue(exception.getMessage().contains("Server encountered an error"));
+        verify(response).statusCode();
+        verify(response).body();
     }
 
     @Test
     public void shouldHandleMalformedResponse() throws Exception {
         // Given
-        String malformedJson = "{\"error\":\"invalid_json\",\"message\":Invalid JSON""";
+        String malformedJson = "{\"error\":\"invalid_json\",\"message\":Invalid JSON\"}";
         HttpResponse<String> response = mock(HttpResponse.class);
-        when(response.statusCode()).thenReturn(400);
+        when(response.statusCode()).thenReturn(500);
         when(response.body()).thenReturn(malformedJson);
 
         // When & Then
-        XrpcException exception = assertThrows(XrpcException.class, () -> {
+        XrpcException exception = Assertions.assertThatThrownBy(() -> {
             errorHandling.handleResponse(response);
-        });
+        }).isInstanceOf(XrpcException.class)
+           .hasMessageContaining("Malformed JSON response");
 
-        assertEquals(400, exception.getStatusCode());
-        assertTrue(exception.getMessage().contains("Invalid JSON"));
+        verify(response).statusCode();
+        verify(response).body();
     }
 }

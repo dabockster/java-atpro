@@ -2,9 +2,14 @@ package com.atproto.security;
 
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.InjectMocks;
 import org.mockito.Mock;
-import org.mockito.Mockito;
-import org.mockito.MockitoAnnotations;
+import org.mockito.junit.jupiter.MockitoExtension;
+import org.owasp.dependencycheck.data.nvdcve.CveDB;
+import org.owasp.dependencycheck.data.nvdcve.DatabaseException;
+import org.owasp.dependencycheck.data.nvdcve.DatabaseProperties;
+import org.owasp.dependencycheck.utils.Settings;
 
 import java.io.File;
 import java.io.IOException;
@@ -12,22 +17,34 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.List;
 
-import static org.junit.jupiter.api.Assertions.*;
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.Mockito.*;
 
+@ExtendWith(MockitoExtension.class)
 public class DependencyCheckTest {
 
     @Mock
     private SecurityService securityService;
 
+    @Mock
+    private CveDB cveDB;
+
+    @Mock
+    private Settings settings;
+
+    @InjectMocks
+    private DependencyCheckService dependencyCheckService;
+
     @BeforeEach
-    void setUp() {
-        MockitoAnnotations.openMocks(this);
+    void setUp() throws DatabaseException {
+        when(settings.getString(Settings.KEYS.DATA_DIRECTORY)).thenReturn(System.getProperty("java.io.tmpdir"));
+        when(cveDB.open()).thenReturn(true);
     }
 
     @Test
     void testSecurityServiceInitialization() {
-        assertNotNull(securityService);
+        assertThat(securityService).isNotNull();
     }
 
     @Test
@@ -37,14 +54,14 @@ public class DependencyCheckTest {
         when(securityService.validateDependencies(testFile)).thenReturn(List.of());
         
         List<String> vulnerabilities = securityService.validateDependencies(testFile);
-        assertTrue(vulnerabilities.isEmpty());
+        assertThat(vulnerabilities).isEmpty();
     }
 
     @Test
     void testDatabaseConnection() {
         when(securityService.testDatabaseConnection()).thenReturn(true);
         
-        assertTrue(securityService.testDatabaseConnection());
+        assertThat(securityService.testDatabaseConnection()).isTrue();
     }
 
     @Test
@@ -54,7 +71,7 @@ public class DependencyCheckTest {
         
         when(securityService.parseConfiguration(configPath)).thenReturn(true);
         
-        assertTrue(securityService.parseConfiguration(configPath));
+        assertThat(securityService.parseConfiguration(configPath)).isTrue();
     }
 
     @Test
@@ -63,9 +80,10 @@ public class DependencyCheckTest {
         
         when(securityService.parseConfiguration(invalidPath)).thenThrow(new RuntimeException("Invalid configuration"));
         
-        assertThrows(RuntimeException.class, () -> {
+        assertThatThrownBy(() -> {
             securityService.parseConfiguration(invalidPath);
-        });
+        }).isInstanceOf(RuntimeException.class)
+          .hasMessage("Invalid configuration");
     }
 
     @Test
@@ -74,6 +92,25 @@ public class DependencyCheckTest {
         
         when(securityService.checkForVulnerabilities(dependency)).thenReturn(false);
         
-        assertFalse(securityService.checkForVulnerabilities(dependency));
+        assertThat(securityService.checkForVulnerabilities(dependency)).isFalse();
+    }
+
+    @Test
+    void testCveDatabaseConnection() throws DatabaseException {
+        assertThat(cveDB.open()).isTrue();
+        assertThat(cveDB.close()).isTrue();
+    }
+
+    @Test
+    void testSettingsConfiguration() {
+        assertThat(settings.getString(Settings.KEYS.DATA_DIRECTORY)).isNotEmpty();
+        assertThat(settings.getBoolean(Settings.KEYS.AUTO_UPDATE)).isTrue();
+    }
+
+    @Test
+    void testDependencyCheckService() {
+        assertThat(dependencyCheckService).isNotNull();
+        assertThatThrownBy(() -> dependencyCheckService.checkDependencies())
+            .isInstanceOf(DatabaseException.class);
     }
 }

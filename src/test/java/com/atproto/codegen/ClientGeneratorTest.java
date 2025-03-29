@@ -1,7 +1,7 @@
 // src/main/test/java/com/atproto/codegen/ClientGeneratorTest.java
 package com.atproto.codegen;
 
-import static org.junit.jupiter.api.Assertions.*;
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.*;
 
 import com.atproto.api.AtpResponse;
@@ -30,24 +30,48 @@ import org.junit.jupiter.params.provider.MethodSource;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
+import org.mockito.InjectMocks;
+import org.mockito.junit.jupiter.MockitoSettings;
+import org.mockito.quality.Strictness;
 
 @ExtendWith(MockitoExtension.class)
+@MockitoSettings(strictness = Strictness.STRICT_STUBS)
 public class ClientGeneratorTest {
 
     @Mock
     private XrpcClient mockXrpcClient;
 
+    @InjectMocks
     private ClientGenerator generator;
 
     @BeforeEach
     public void setUp() {
-        generator = new ClientGenerator();
+        // Reset mocks between tests
+        Mockito.reset(mockXrpcClient);
+    }
+
+    @ParameterizedTest
+    @MethodSource("provideImportData")
+    void testGeneratedImports(String generatedCode, String[] expectedImports) {
+        for (String expectedImport : expectedImports) {
+            assertThat(generatedCode)
+                .contains("import " + expectedImport + ";")
+                .as("Expected import not found: " + expectedImport);
+        }
+    }
+
+    private static Stream<Arguments> provideImportData() {
+        return Stream.of(
+            Arguments.of("", new String[] {}),
+            Arguments.of("import java.util.List;", new String[] {"java.util.List"})
+        );
     }
 
     private void verifyImports(String generatedCode, String... expectedImports) {
         for (String expectedImport : expectedImports) {
-            assertTrue(generatedCode.contains("import " + expectedImport + ";"),
-                    "Expected import not found: " + expectedImport);
+            assertThat(generatedCode)
+                .contains("import " + expectedImport + ";")
+                .as("Expected import not found: " + expectedImport);
         }
     }
 
@@ -56,13 +80,12 @@ public class ClientGeneratorTest {
         LexiconDoc lexiconDoc = TestUtils.createSimpleQueryLexicon();
         String generatedCode = generator.generateClient(lexiconDoc);
 
-        assertTrue(generatedCode.contains("package com.example;"));
-        assertTrue(generatedCode.contains("public class SimpleQueryClient"));
-        assertTrue(generatedCode.contains("public AtpResponse"));
-        assertTrue(generatedCode.contains("simpleQuery("));
-        assertTrue(generatedCode.contains("xrpcClient.sendQuery"));
-        assertFalse(generatedCode.contains("import com.atproto.api.xrpc.XRPCException;")); // No params, no
-                                                                                           // XRPCException
+        assertThat(generatedCode).contains("package com.example;");
+        assertThat(generatedCode).contains("public class SimpleQueryClient");
+        assertThat(generatedCode).contains("public AtpResponse");
+        assertThat(generatedCode).contains("simpleQuery(");
+        assertThat(generatedCode).contains("xrpcClient.sendQuery");
+        assertThat(generatedCode).doesNotContain("import com.atproto.api.xrpc.XRPCException;"); // No params, no XRPCException
         verifyImports(generatedCode, "com.atproto.api.AtpResponse");
 
         // --- Compilation and Reflection ---
@@ -81,7 +104,7 @@ public class ClientGeneratorTest {
         // Invoke and check return type.
         java.lang.reflect.Method method = generatedClientClass.getMethod("simpleQuery");
         Object result = method.invoke(clientInstance);
-        assertInstanceOf(AtpResponse.class, result);
+        assertThat(result).isInstanceOf(AtpResponse.class);
     }
 
     @Test
@@ -90,11 +113,11 @@ public class ClientGeneratorTest {
         String generatedCode = generator.generateClient(lexiconDoc);
 
         // Basic checks
-        assertTrue(generatedCode.contains("package com.example;"));
-        assertTrue(generatedCode.contains("public class ParamsQueryClient"));
-        assertTrue(generatedCode.contains("public AtpResponse"));
-        assertTrue(generatedCode.contains("paramsQuery(ParamsQueryParams params"));
-        assertTrue(generatedCode.contains("xrpcClient.sendQuery"));
+        assertThat(generatedCode).contains("package com.example;");
+        assertThat(generatedCode).contains("public class ParamsQueryClient");
+        assertThat(generatedCode).contains("public AtpResponse");
+        assertThat(generatedCode).contains("paramsQuery(ParamsQueryParams params");
+        assertThat(generatedCode).contains("xrpcClient.sendQuery");
 
         // --- Compilation and Reflection ---
         Class<?> generatedClientClass = TestUtils.InMemoryCompiler.compile("com.example.ParamsQueryClient",
@@ -115,7 +138,7 @@ public class ClientGeneratorTest {
         // Invoke and check return type
         java.lang.reflect.Method method = generatedClientClass.getMethod("paramsQuery", paramClass);
         Object result = method.invoke(clientInstance, paramInstance);
-        assertInstanceOf(AtpResponse.class, result);
+        assertThat(result).isInstanceOf(AtpResponse.class);
 
         verifyImports(generatedCode,
                 "com.example.ParamsQueryParams",
@@ -128,11 +151,11 @@ public class ClientGeneratorTest {
         String generatedCode = generator.generateClient(lexiconDoc);
 
         // Basic checks
-        assertTrue(generatedCode.contains("package com.example;"));
-        assertTrue(generatedCode.contains("public class ProcedureClient"));
-        assertTrue(generatedCode.contains("public AtpResponse"));
-        assertTrue(generatedCode.contains("procedure(ProcedureProcedureInput input"));
-        assertTrue(generatedCode.contains("xrpcClient.sendProcedure"));
+        assertThat(generatedCode).contains("package com.example;");
+        assertThat(generatedCode).contains("public class ProcedureClient");
+        assertThat(generatedCode).contains("public AtpResponse");
+        assertThat(generatedCode).contains("procedure(ProcedureProcedureInput input");
+        assertThat(generatedCode).contains("xrpcClient.sendProcedure");
 
         // --- Compilation and Reflection ---
         Class<?> generatedClientClass = TestUtils.InMemoryCompiler.compile("com.example.ProcedureClient",
@@ -153,7 +176,7 @@ public class ClientGeneratorTest {
         // Execute and test
         java.lang.reflect.Method method = generatedClientClass.getMethod("procedure", inputClass);
         Object result = method.invoke(clientInstance, inputInstance);
-        assertInstanceOf(AtpResponse.class, result);
+        assertThat(result).isInstanceOf(AtpResponse.class);
         verifyImports(generatedCode, "com.example.ProcedureProcedureInput", "com.atproto.api.AtpResponse",
                 "java.util.Optional");
     }
@@ -164,11 +187,11 @@ public class ClientGeneratorTest {
         ClientGenerator generator = new ClientGenerator();
         String generatedCode = generator.generateClient(lexiconDoc);
 
-        assertTrue(generatedCode.contains("package com.example;"));
-        assertTrue(generatedCode.contains("public class SubscriptionClient"));
-        assertTrue(generatedCode.contains("public void"));
-        assertTrue(generatedCode.contains("subscription("));
-        assertTrue(generatedCode.contains("throw new UnsupportedOperationException"));
+        assertThat(generatedCode).contains("package com.example;");
+        assertThat(generatedCode).contains("public class SubscriptionClient");
+        assertThat(generatedCode).contains("public void");
+        assertThat(generatedCode).contains("subscription(");
+        assertThat(generatedCode).contains("throw new UnsupportedOperationException");
 
         // Subscriptions typically don't have explicit input/output, so minimal imports
         // are expected.
@@ -181,8 +204,8 @@ public class ClientGeneratorTest {
         ClientGenerator generator = new ClientGenerator();
         String generatedCode = generator.generateClient(lexiconDoc);
 
-        assertTrue(generatedCode.contains("queryMethod("));
-        assertTrue(generatedCode.contains("procedureMethod("));
+        assertThat(generatedCode).contains("queryMethod(");
+        assertThat(generatedCode).contains("procedureMethod(");
         verifyImports(generatedCode, "com.atproto.api.AtpResponse"); // At least AtpResponse should be there
 
     }
@@ -192,7 +215,8 @@ public class ClientGeneratorTest {
         LexiconDoc lexiconDoc = TestUtils.createDuplicateMethodLexicon();
         ClientGenerator generator = new ClientGenerator();
         String generatedCode = generator.generateClient(lexiconDoc);
-        assertEquals(1, countOccurrences(generatedCode, "queryMethod"));
+        int count = countOccurrences(generatedCode, "queryMethod");
+        assertThat(count).isEqualTo(1);
     }
 
     public int countOccurrences(String text, String word) {
@@ -216,7 +240,7 @@ public class ClientGeneratorTest {
         // parameters.
         // But XRPCException can still be thrown by the underlying sendQuery, even
         // without parameters.
-        assertTrue(generatedCode.contains("import com.atproto.api.xrpc.XRPCException;"));
+        assertThat(generatedCode).contains("import com.atproto.api.xrpc.XRPCException;");
 
         Class<?> generatedClientClass = TestUtils.InMemoryCompiler.compile("com.example.SimpleQueryClient",
                 generatedCode);
@@ -239,7 +263,7 @@ public class ClientGeneratorTest {
         LexiconDoc lexiconDoc = TestUtils.createSimpleQueryLexicon();
         ClientGenerator generator = new ClientGenerator();
         String generatedCode = generator.generateClient(lexiconDoc);
-        assertTrue(generatedCode.contains("import com.atproto.api.AtpResponse;")); // Should import AtpResponse
+        assertThat(generatedCode).contains("import com.atproto.api.AtpResponse;"); // Should import AtpResponse
     }
 
     @ParameterizedTest
@@ -250,9 +274,9 @@ public class ClientGeneratorTest {
         ClientGenerator generator = new ClientGenerator();
         String generatedCode = generator.generateClient(lexiconDoc);
 
-        assertTrue(generatedCode.contains("package com.example;"));
-        assertTrue(generatedCode.contains(paramName));
-        assertTrue(generatedCode.contains(expectedType + " " + paramName));
+        assertThat(generatedCode).contains("package com.example;");
+        assertThat(generatedCode).contains(paramName);
+        assertThat(generatedCode).contains(expectedType + " " + paramName);
 
         verifyImports(generatedCode, expectedImport); // Verify the specific import
 
@@ -297,7 +321,7 @@ public class ClientGeneratorTest {
 
         String actualReturnType = method.getGenericReturnType().getTypeName()
                 .replace("java.util.concurrent.CompletableFuture", "AtpResponse");
-        assertEquals(expectedReturnType, actualReturnType);
+        assertThat(expectedReturnType).isEqualTo(actualReturnType);
 
         if (method.getParameterCount() > 0) {
             when(mockXrpcClient.sendQuery(anyString(), any(), any(), any()))
@@ -425,11 +449,11 @@ public class ClientGeneratorTest {
         String generatedCode = generator.generateClient(lexiconDoc);
 
         // Basic checks
-        assertTrue(generatedCode.contains("package com.example;")); // Package name
-        assertTrue(generatedCode.contains("public class NestedObjectClient")); // Class Name.
-        assertTrue(generatedCode.contains("public AtpResponse")); // Returns AtpResponse
-        assertTrue(
-                generatedCode.contains(
+        assertThat(generatedCode).contains("package com.example;"); // Package name
+        assertThat(generatedCode).contains("public class NestedObjectClient"); // Class Name.
+        assertThat(generatedCode).contains("public AtpResponse"); // Returns AtpResponse
+        assertThat(
+                generatedCode).contains(
                         "nestedObject(")); // Query method with parameters and type
 
         // --- Compilation and Reflection, as before, BUT: ---
@@ -450,7 +474,7 @@ public class ClientGeneratorTest {
         // 4. Get and Invoke Method, Assert Return Type
         java.lang.reflect.Method method = generatedClientClass.getMethod("nestedObject");
         Object result = method.invoke(clientInstance);
-        assertInstanceOf(AtpResponse.class, result); // Very basic check
+        assertThat(result).isInstanceOf(AtpResponse.class); // Very basic check
 
         // You could add in more specific checks with Mockito here to check call
         // parameters
@@ -469,9 +493,9 @@ public class ClientGeneratorTest {
         LexiconDoc lexiconDoc = TestUtils.createLexiconWithMultipleDefs();
         ClientGenerator generator = new ClientGenerator();
         String generatedCode = generator.generateClient(lexiconDoc);
-        assertTrue(generatedCode.contains("class Query1Client"));
-        assertTrue(generatedCode.contains("class Query2Client"));
-        assertTrue(generatedCode.contains("class Record1Record")); // Check for records.
+        assertThat(generatedCode).contains("class Query1Client");
+        assertThat(generatedCode).contains("class Query2Client");
+        assertThat(generatedCode).contains("class Record1Record"); // Check for records.
     }
 
     @ParameterizedTest // Enhanced to be parameterized
@@ -482,15 +506,15 @@ public class ClientGeneratorTest {
         ClientGenerator generator = new ClientGenerator();
         String generatedCode = generator.generateClient(lexiconDoc);
 
-        assertTrue(generatedCode.contains("package com.example;"));
+        assertThat(generatedCode).contains("package com.example;");
         String className = lexiconDoc.getId().substring(lexiconDoc.getId().lastIndexOf('.') + 1) + "Client";
 
-        assertTrue(generatedCode.contains("public class " + className));
+        assertThat(generatedCode).contains("public class " + className);
 
         // Dynamic method name check
-        assertTrue(
-                generatedCode.contains(
-                        "public AtpResponse " + methodName + "(" + expectedParamType + " params)"));
+        assertThat(
+                generatedCode).contains(
+                        "public AtpResponse " + methodName + "(" + expectedParamType + " params)");
 
         verifyImports(generatedCode, expectedImport);
 
@@ -517,10 +541,10 @@ public class ClientGeneratorTest {
         String generatedCode = generator.generateClient(lexiconDoc);
 
         // Basic Javadoc checks
-        assertTrue(generatedCode.contains("/**"));
-        assertTrue(generatedCode.contains("* This is a test query.")); // Check for the description.
-        assertTrue(generatedCode.contains("*/"));
-        assertTrue(generatedCode.contains("public class SimpleQueryClientWithDescription"));
+        assertThat(generatedCode).contains("/**");
+        assertThat(generatedCode).contains("* This is a test query."); // Check for the description.
+        assertThat(generatedCode).contains("*/");
+        assertThat(generatedCode).contains("public class SimpleQueryClientWithDescription");
 
         // Compile and load the class, then verify with reflection
         Class<?> generatedClientClass = TestUtils.InMemoryCompiler.compile(
@@ -590,13 +614,13 @@ public class ClientGeneratorTest {
 
         // const constraint
         if (constValue != null) {
-            assertTrue(
-                    generatedCode.contains(
+            assertThat(
+                    generatedCode).contains(
                             "public static final String "
                                     + paramName.toUpperCase()
                                     + " = \""
                                     + constValue
-                                    + "\";"));
+                                    + "\";");
         }
 
         // Regex pattern (using annotation value)

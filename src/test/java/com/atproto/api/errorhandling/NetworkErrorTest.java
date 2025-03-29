@@ -7,10 +7,10 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.assertj.core.api.Assertions;
 
 import java.util.concurrent.TimeoutException;
 
-import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.*;
 
@@ -32,12 +32,13 @@ public class NetworkErrorTest {
         // Test connection timeout
         when(xrpcClient.send(any())).thenThrow(new TimeoutException("Connection timeout"));
 
-        XrpcException exception = assertThrows(XrpcException.class, () -> {
+        XrpcException exception = Assertions.assertThatThrownBy(() -> {
             subject.sendRequest();
-        });
+        }).isInstanceOf(XrpcException.class)
+           .hasMessageContaining("timeout")
+           .satisfies(e -> Assertions.assertThat(e.isTimeout()).isTrue());
 
-        assertTrue(exception.getMessage().contains("timeout"));
-        assertTrue(exception.isTimeout());
+        verify(xrpcClient).send(any());
     }
 
     @Test
@@ -45,12 +46,13 @@ public class NetworkErrorTest {
         // Test read timeout
         when(xrpcClient.send(any())).thenThrow(new TimeoutException("Read timeout"));
 
-        XrpcException exception = assertThrows(XrpcException.class, () -> {
+        XrpcException exception = Assertions.assertThatThrownBy(() -> {
             subject.sendRequest();
-        });
+        }).isInstanceOf(XrpcException.class)
+           .hasMessageContaining("timeout")
+           .satisfies(e -> Assertions.assertThat(e.isTimeout()).isTrue());
 
-        assertTrue(exception.getMessage().contains("timeout"));
-        assertTrue(exception.isTimeout());
+        verify(xrpcClient).send(any());
     }
 
     @Test
@@ -58,12 +60,13 @@ public class NetworkErrorTest {
         // Test network unreachable
         when(xrpcClient.send(any())).thenThrow(new RuntimeException("Network unreachable"));
 
-        XrpcException exception = assertThrows(XrpcException.class, () -> {
+        XrpcException exception = Assertions.assertThatThrownBy(() -> {
             subject.sendRequest();
-        });
+        }).isInstanceOf(XrpcException.class)
+           .hasMessageContaining("network unreachable")
+           .satisfies(e -> Assertions.assertThat(e.isNetworkError()).isTrue());
 
-        assertTrue(exception.getMessage().contains("network unreachable"));
-        assertTrue(exception.isNetworkError());
+        verify(xrpcClient).send(any());
     }
 
     @Test
@@ -71,12 +74,13 @@ public class NetworkErrorTest {
         // Test SSL handshake failure
         when(xrpcClient.send(any())).thenThrow(new RuntimeException("SSL handshake failed"));
 
-        XrpcException exception = assertThrows(XrpcException.class, () -> {
+        XrpcException exception = Assertions.assertThatThrownBy(() -> {
             subject.sendRequest();
-        });
+        }).isInstanceOf(XrpcException.class)
+           .hasMessageContaining("SSL")
+           .satisfies(e -> Assertions.assertThat(e.isNetworkError()).isTrue());
 
-        assertTrue(exception.getMessage().contains("SSL"));
-        assertTrue(exception.isNetworkError());
+        verify(xrpcClient).send(any());
     }
 
     @Test
@@ -84,12 +88,13 @@ public class NetworkErrorTest {
         // Test proxy configuration error
         when(xrpcClient.send(any())).thenThrow(new RuntimeException("Proxy authentication required"));
 
-        XrpcException exception = assertThrows(XrpcException.class, () -> {
+        XrpcException exception = Assertions.assertThatThrownBy(() -> {
             subject.sendRequest();
-        });
+        }).isInstanceOf(XrpcException.class)
+           .hasMessageContaining("proxy")
+           .satisfies(e -> Assertions.assertThat(e.isNetworkError()).isTrue());
 
-        assertTrue(exception.getMessage().contains("proxy"));
-        assertTrue(exception.isNetworkError());
+        verify(xrpcClient).send(any());
     }
 
     @Test
@@ -97,7 +102,10 @@ public class NetworkErrorTest {
         // Test successful request
         when(xrpcClient.send(any())).thenReturn(null);
 
-        assertDoesNotThrow(() -> subject.sendRequest());
+        Assertions.assertThatCode(() -> subject.sendRequest())
+                  .doesNotThrowAnyException();
+
+        verify(xrpcClient).send(any());
     }
 
     // Helper methods for testing

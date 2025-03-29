@@ -1,10 +1,10 @@
 package com.atproto.did;
 
-import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.CsvSource;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
@@ -13,7 +13,8 @@ import java.io.IOException;
 import java.util.HashMap;
 import java.util.Map;
 
-import static org.junit.jupiter.api.Assertions.*;
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
@@ -35,69 +36,111 @@ public class DidResolverTest {
 
     @Test
     public void testDidResolution() throws IOException {
-        // Mock DID document
-        JsonNode didDocNode = objectMapper.readTree(TEST_DID_DOC);
-        when(objectMapper.readTree(TEST_DID_DOC)).thenReturn(didDocNode);
-
         // Test successful resolution
         JsonNode resolvedDoc = didResolver.resolve(TEST_DID);
-        assertNotNull(resolvedDoc);
-        assertEquals(TEST_DID, resolvedDoc.get("id").asText());
+        assertThat(resolvedDoc).isNotNull();
+        assertThat(resolvedDoc.get("id").asText()).isEqualTo(TEST_DID);
 
-        // Test invalid DID format
-        assertThrows(IllegalArgumentException.class, () -> {
-            didResolver.resolve("invalid_did_format");
-        });
+        // Test invalid DID format using AssertJ
+        assertThatThrownBy(() -> didResolver.resolve("invalid_did_format"))
+            .isInstanceOf(IllegalArgumentException.class);
 
         // Test non-existent DID
-        assertThrows(DidResolutionException.class, () -> {
-            didResolver.resolve("did:plc:nonexistent");
-        });
+        assertThatThrownBy(() -> didResolver.resolve("did:plc:nonexistent"))
+            .isInstanceOf(DidResolutionException.class);
+    }
+
+    @ParameterizedTest
+    @CsvSource({
+        "did:plc:123, true",
+        "did:plc:invalid, false",
+        "did:web:example.com, true",
+        "did:key:z6MkghvF5svAmD2NBGntQHPdGjcS6a6t9QjfQwd4UDmYx8Av, true",
+        "did:web:example.com/path, false",
+        "did:example:123, false"
+    })
+    public void testDidFormatValidation(String did, boolean expected) {
+        assertThat(didResolver.validateDidFormat(did)).isEqualTo(expected);
     }
 
     @Test
     public void testDidDocumentValidation() throws IOException {
         // Test valid DID document
-        assertTrue(didResolver.validateDidDocument(TEST_DID_DOC));
+        assertThat(didResolver.validateDidDocument(TEST_DID_DOC)).isTrue();
 
         // Test invalid DID document (missing id)
         String invalidDoc = "{\"verificationMethod\":[{\"id\":\"#key1\",\"type\":\"Ed25519VerificationKey2020\",\"controller\":\"did:plc:123\",\"publicKeyMultibase\":\"z6MkghvF5svAmD2NBGntQHPdGjcS6a6t9QjfQwd4UDmYx8Av\"}]}";
-        assertFalse(didResolver.validateDidDocument(invalidDoc));
+        assertThat(didResolver.validateDidDocument(invalidDoc)).isFalse();
 
         // Test invalid DID document (invalid verification method)
         String invalidVerificationDoc = "{\"id\":\"did:plc:123\",\"verificationMethod\":[{\"id\":\"#key1\",\"type\":\"InvalidType\",\"controller\":\"did:plc:123\",\"publicKeyMultibase\":\"z6MkghvF5svAmD2NBGntQHPdGjcS6a6t9QjfQwd4UDmYx8Av\"}]}";
-        assertFalse(didResolver.validateDidDocument(invalidVerificationDoc));
+        assertThat(didResolver.validateDidDocument(invalidVerificationDoc)).isFalse();
+
+        // Test valid DID document with service endpoints
+        String docWithService = "{\"id\":\"did:plc:123\",\"verificationMethod\":[{\"id\":\"#key1\",\"type\":\"Ed25519VerificationKey2020\",\"controller\":\"did:plc:123\",\"publicKeyMultibase\":\"z6MkghvF5svAmD2NBGntQHPdGjcS6a6t9QjfQwd4UDmYx8Av\"}],\"service\":[{\"id\":\"#atp\",\"type\":\"atproto\",\"serviceEndpoint\":\"https://bsky.social\"}]}";
+        assertThat(didResolver.validateDidDocument(docWithService)).isTrue();
     }
 
     @Test
     public void testDidAuth() throws IOException {
         // Test successful authentication
-        assertTrue(didResolver.authenticate(TEST_DID, "z6MkghvF5svAmD2NBGntQHPdGjcS6a6t9QjfQwd4UDmYx8Av"));
+        assertThat(didResolver.authenticate(TEST_DID, "z6MkghvF5svAmD2NBGntQHPdGjcS6a6t9QjfQwd4UDmYx8Av")).isTrue();
 
         // Test failed authentication (wrong key)
-        assertFalse(didResolver.authenticate(TEST_DID, "invalid_key"));
+        assertThat(didResolver.authenticate(TEST_DID, "invalid_key")).isFalse();
 
         // Test failed authentication (non-existent DID)
-        assertThrows(DidAuthenticationException.class, () -> {
-            didResolver.authenticate("did:plc:nonexistent", "z6MkghvF5svAmD2NBGntQHPdGjcS6a6t9QjfQwd4UDmYx8Av");
-        });
+        assertThatThrownBy(() -> didResolver.authenticate("did:plc:nonexistent", "z6MkghvF5svAmD2NBGntQHPdGjcS6a6t9QjfQwd4UDmYx8Av"))
+            .isInstanceOf(DidAuthenticationException.class);
+
+        // Test authentication with different key type
+        String ed25519Key = "z6MkghvF5svAmD2NBGntQHPdGjcS6a6t9QjfQwd4UDmYx8Av";
+        String secp256k1Key = "z6MkghvF5svAmD2NBGntQHPdGjcS6a6t9QjfQwd4UDmYx8Av";
+        assertThat(didResolver.authenticate(TEST_DID, ed25519Key)).isTrue();
+        assertThat(didResolver.authenticate(TEST_DID, secp256k1Key)).isTrue();
     }
 
     @Test
     public void testDidErrorHandling() {
         // Test DID resolution error
-        assertThrows(DidResolutionException.class, () -> {
-            didResolver.resolve("did:plc:invalid");
-        });
+        assertThatThrownBy(() -> didResolver.resolve("did:plc:invalid"))
+            .isInstanceOf(DidResolutionException.class);
 
         // Test DID document parsing error
-        assertThrows(DidDocumentParseException.class, () -> {
-            didResolver.validateDidDocument("invalid_json");
-        });
+        assertThatThrownBy(() -> didResolver.validateDidDocument("invalid_json"))
+            .isInstanceOf(DidDocumentParseException.class);
 
         // Test authentication error
-        assertThrows(DidAuthenticationException.class, () -> {
-            didResolver.authenticate("did:plc:invalid", "key");
-        });
+        assertThatThrownBy(() -> didResolver.authenticate("did:plc:invalid", "key"))
+            .isInstanceOf(DidAuthenticationException.class);
+
+        // Test cache-related errors
+        assertThatThrownBy(() -> didResolver.resolveFromCache("did:plc:expired"))
+            .isInstanceOf(DidCacheException.class);
+    }
+
+    @Test
+    public void testSecurityVulnerabilities() {
+        // Test for potential security vulnerabilities
+        String maliciousInput = "did:plc:123\";alert('XSS');\"";
+        assertThat(didResolver.resolve(maliciousInput)).isNull();
+
+        String invalidJson = "{\"id\":\"did:plc:123\",\"verificationMethod\":[]}";
+        assertThat(didResolver.validateDidDocument(invalidJson)).isFalse();
+
+        // Test for signature verification
+        String docWithInvalidSignature = "{\"id\":\"did:plc:123\",\"verificationMethod\":[{\"id\":\"#key1\",\"type\":\"Ed25519VerificationKey2020\",\"controller\":\"did:plc:123\",\"publicKeyMultibase\":\"z6MkghvF5svAmD2NBGntQHPdGjcS6a6t9QjfQwd4UDmYx8Av\"}],\"signature\":\"invalid_signature\"}";
+        assertThat(didResolver.validateDidDocument(docWithInvalidSignature)).isFalse();
+    }
+
+    @Test
+    public void testDidDocumentVersioning() {
+        // Test document versioning
+        String v1Doc = "{\"id\":\"did:plc:123\",\"verificationMethod\":[{\"id\":\"#key1\",\"type\":\"Ed25519VerificationKey2020\",\"controller\":\"did:plc:123\",\"publicKeyMultibase\":\"z6MkghvF5svAmD2NBGntQHPdGjcS6a6t9QjfQwd4UDmYx8Av\"}],\"version\":\"1\"}";
+        String v2Doc = "{\"id\":\"did:plc:123\",\"verificationMethod\":[{\"id\":\"#key1\",\"type\":\"Ed25519VerificationKey2020\",\"controller\":\"did:plc:123\",\"publicKeyMultibase\":\"z6MkghvF5svAmD2NBGntQHPdGjcS6a6t9QjfQwd4UDmYx8Av\"}],\"version\":\"2\"}";
+        
+        assertThat(didResolver.validateDidDocument(v1Doc)).isTrue();
+        assertThat(didResolver.validateDidDocument(v2Doc)).isTrue();
+        assertThat(didResolver.compareDocumentVersions(v1Doc, v2Doc)).isTrue();
     }
 }

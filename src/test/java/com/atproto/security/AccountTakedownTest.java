@@ -2,6 +2,8 @@ package com.atproto.security;
 
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
@@ -9,7 +11,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.util.Map;
 
-import static org.junit.jupiter.api.Assertions.*;
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.when;
 
@@ -47,9 +49,9 @@ class AccountTakedownTest {
     void testAccountTakedown() {
         boolean result = moderationService.updateSubjectStatus((XrpcRequest) request);
 
-        assertTrue(result);
-        assertTrue(moderationService.isTakedownApplied(TEST_DID));
-        assertEquals(TEST_TAKEDOWN_REF, moderationService.getTakedownRef(TEST_DID));
+        assertThat(result).isTrue();
+        assertThat(moderationService.isTakedownApplied(TEST_DID)).isTrue();
+        assertThat(moderationService.getTakedownRef(TEST_DID)).isEqualTo(TEST_TAKEDOWN_REF);
     }
 
     @Test
@@ -70,29 +72,31 @@ class AccountTakedownTest {
 
         boolean result = moderationService.updateSubjectStatus((XrpcRequest) request);
 
-        assertTrue(result);
-        assertFalse(moderationService.isTakedownApplied(TEST_DID));
-        assertNull(moderationService.getTakedownRef(TEST_DID));
+        assertThat(result).isTrue();
+        assertThat(moderationService.isTakedownApplied(TEST_DID)).isFalse();
+        assertThat(moderationService.getTakedownRef(TEST_DID)).isNull();
     }
 
-    @Test
-    void testRecordTakedown() {
-        Object recordRef = new Object();
+    @ParameterizedTest
+    @ValueSource(strings = {"record1", "record2", "record3"})
+    void testRecordTakedown(String recordRef) {
+        Object record = new Object();
 
-        boolean result = moderationService.takeDownRecord(recordRef);
+        boolean result = moderationService.takeDownRecord(record);
 
-        assertTrue(result);
-        assertTrue(moderationService.isRecordTakedownApplied(recordRef));
+        assertThat(result).isTrue();
+        assertThat(moderationService.isRecordTakedownApplied(record)).isTrue();
     }
 
-    @Test
-    void testBlobTakedown() {
-        Object blobRef = new Object();
+    @ParameterizedTest
+    @ValueSource(strings = {"blob1", "blob2", "blob3"})
+    void testBlobTakedown(String blobRef) {
+        Object blob = new Object();
 
-        boolean result = moderationService.takeDownBlob(blobRef);
+        boolean result = moderationService.takeDownBlob(blob);
 
-        assertTrue(result);
-        assertTrue(moderationService.isBlobTakedownApplied(blobRef));
+        assertThat(result).isTrue();
+        assertThat(moderationService.isBlobTakedownApplied(blob)).isTrue();
     }
 
     @Test
@@ -100,8 +104,37 @@ class AccountTakedownTest {
         // Take down the account
         moderationService.updateSubjectStatus((XrpcRequest) request);
 
-        Object status = moderationService.getSubjectStatus(TEST_DID);
+        // Verify account status
+        assertThat(moderationService.isTakedownApplied(TEST_DID)).isTrue();
+        assertThat(moderationService.getTakedownRef(TEST_DID)).isEqualTo(TEST_TAKEDOWN_REF);
 
-        assertNotNull(status);
+        // Verify record status
+        Object record = new Object();
+        moderationService.takeDownRecord(record);
+        assertThat(moderationService.isRecordTakedownApplied(record)).isTrue();
+
+        // Verify blob status
+        Object blob = new Object();
+        moderationService.takeDownBlob(blob);
+        assertThat(moderationService.isBlobTakedownApplied(blob)).isTrue();
+    }
+
+    @Test
+    void testMultipleTakedowns() {
+        // Take down account
+        moderationService.updateSubjectStatus((XrpcRequest) request);
+
+        // Take down record
+        Object record = new Object();
+        moderationService.takeDownRecord(record);
+
+        // Take down blob
+        Object blob = new Object();
+        moderationService.takeDownBlob(blob);
+
+        // Verify all takedowns
+        assertThat(moderationService.isTakedownApplied(TEST_DID)).isTrue();
+        assertThat(moderationService.isRecordTakedownApplied(record)).isTrue();
+        assertThat(moderationService.isBlobTakedownApplied(blob)).isTrue();
     }
 }

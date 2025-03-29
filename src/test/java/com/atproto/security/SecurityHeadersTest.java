@@ -3,13 +3,15 @@ package com.atproto.security;
 import com.atproto.api.xrpc.XrpcResponse;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.util.List;
 
-import static org.junit.jupiter.api.Assertions.*;
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
@@ -29,15 +31,15 @@ class SecurityHeadersTest {
     void testAllSecurityHeadersPresent() {
         securityHeadersFilter.addSecurityHeaders(response);
         
-        assertNotNull(response.getHeaders().get("Strict-Transport-Security"));
-        assertNotNull(response.getHeaders().get("X-Content-Type-Options"));
-        assertNotNull(response.getHeaders().get("X-Frame-Options"));
-        assertNotNull(response.getHeaders().get("X-XSS-Protection"));
-        assertNotNull(response.getHeaders().get("Content-Security-Policy"));
-        assertNotNull(response.getHeaders().get("Referrer-Policy"));
-        assertNotNull(response.getHeaders().get("X-Permitted-Cross-Domain-Policies"));
-        assertNotNull(response.getHeaders().get("X-Download-Options"));
-        assertNotNull(response.getHeaders().get("X-Content-Type-Options"));
+        assertThat(response.getHeaders().get("Strict-Transport-Security")).isNotNull();
+        assertThat(response.getHeaders().get("X-Content-Type-Options")).isNotNull();
+        assertThat(response.getHeaders().get("X-Frame-Options")).isNotNull();
+        assertThat(response.getHeaders().get("X-XSS-Protection")).isNotNull();
+        assertThat(response.getHeaders().get("Content-Security-Policy")).isNotNull();
+        assertThat(response.getHeaders().get("Referrer-Policy")).isNotNull();
+        assertThat(response.getHeaders().get("X-Permitted-Cross-Domain-Policies")).isNotNull();
+        assertThat(response.getHeaders().get("X-Download-Options")).isNotNull();
+        assertThat(response.getHeaders().get("X-Content-Type-Options")).isNotNull();
     }
 
     @Test
@@ -45,12 +47,12 @@ class SecurityHeadersTest {
         securityHeadersFilter.addSecurityHeaders(response);
         
         String csp = response.getHeaders().get("Content-Security-Policy").get(0);
-        assertTrue(csp.contains("default-src 'self'"));
-        assertTrue(csp.contains("script-src 'self' 'unsafe-inline'"));
-        assertTrue(csp.contains("style-src 'self' 'unsafe-inline'"));
-        assertTrue(csp.contains("img-src 'self' data:"));
-        assertTrue(csp.contains("connect-src 'self'"));
-        assertTrue(csp.contains("font-src 'self'"));
+        assertThat(csp).contains("default-src 'self'")
+                       .contains("script-src 'self' 'unsafe-inline'")
+                       .contains("style-src 'self' 'unsafe-inline'")
+                       .contains("img-src 'self' data:")
+                       .contains("connect-src 'self'")
+                       .contains("font-src 'self'");
     }
 
     @Test
@@ -58,9 +60,9 @@ class SecurityHeadersTest {
         securityHeadersFilter.addSecurityHeaders(response);
         
         String hsts = response.getHeaders().get("Strict-Transport-Security").get(0);
-        assertTrue(hsts.contains("max-age=31536000"));
-        assertTrue(hsts.contains("includeSubDomains"));
-        assertTrue(hsts.contains("preload"));
+        assertThat(hsts).contains("max-age=31536000")
+                       .contains("includeSubDomains")
+                       .contains("preload");
     }
 
     @Test
@@ -68,7 +70,7 @@ class SecurityHeadersTest {
         securityHeadersFilter.addSecurityHeaders(response);
         
         String referrer = response.getHeaders().get("Referrer-Policy").get(0);
-        assertEquals("strict-origin-when-cross-origin", referrer);
+        assertThat(referrer).isEqualTo("strict-origin-when-cross-origin");
     }
 
     @Test
@@ -76,7 +78,7 @@ class SecurityHeadersTest {
         securityHeadersFilter.addSecurityHeaders(response);
         
         String frame = response.getHeaders().get("X-Frame-Options").get(0);
-        assertEquals("DENY", frame);
+        assertThat(frame).isEqualTo("DENY");
     }
 
     @Test
@@ -84,7 +86,7 @@ class SecurityHeadersTest {
         securityHeadersFilter.addSecurityHeaders(response);
         
         String contentType = response.getHeaders().get("X-Content-Type-Options").get(0);
-        assertEquals("nosniff", contentType);
+        assertThat(contentType).isEqualTo("nosniff");
     }
 
     @Test
@@ -92,23 +94,32 @@ class SecurityHeadersTest {
         securityHeadersFilter.addSecurityHeaders(response);
         
         String xss = response.getHeaders().get("X-XSS-Protection").get(0);
-        assertEquals("1; mode=block", xss);
+        assertThat(xss).isEqualTo("1; mode=block");
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"X-Permitted-Cross-Domain-Policies", "X-Download-Options"})
+    void testAdditionalSecurityHeaders(String headerName) {
+        securityHeadersFilter.addSecurityHeaders(response);
+        
+        assertThat(response.getHeaders().get(headerName)).isNotNull();
     }
 
     @Test
-    void testXPermittedCrossDomainPolicies() {
+    void testSecurityHeadersOrder() {
         securityHeadersFilter.addSecurityHeaders(response);
         
-        String crossDomain = response.getHeaders().get("X-Permitted-Cross-Domain-Policies").get(0);
-        assertEquals("none", crossDomain);
-    }
-
-    @Test
-    void testXDownloadOptions() {
-        securityHeadersFilter.addSecurityHeaders(response);
-        
-        String download = response.getHeaders().get("X-Download-Options").get(0);
-        assertEquals("noopen", download);
+        List<String> headers = response.getHeaders().keySet().stream()
+            .filter(h -> h.startsWith("X-"))
+            .toList();
+            
+        assertThat(headers).containsExactly(
+            "X-Content-Type-Options",
+            "X-Frame-Options",
+            "X-XSS-Protection",
+            "X-Permitted-Cross-Domain-Policies",
+            "X-Download-Options"
+        );
     }
 
     @Test

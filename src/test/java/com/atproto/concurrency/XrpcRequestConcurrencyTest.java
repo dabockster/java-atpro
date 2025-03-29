@@ -1,11 +1,15 @@
-package com.atprotocol.concurrency;
+package com.atproto.concurrency;
 
 import com.atprotocol.api.xrpc.XrpcClient;
 import com.atprotocol.api.xrpc.XrpcServer;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.Timeout;
-import org.mockito.Mockito;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
+import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.junit.jupiter.MockitoExtension;
+import org.assertj.core.api.Assertions;
 
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutorService;
@@ -15,6 +19,7 @@ import java.util.concurrent.TimeUnit;
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.Mockito.*;
 
+@ExtendWith(MockitoExtension.class)
 public class XrpcRequestConcurrencyTest {
     private static final int THREAD_COUNT = 20;
     private static final int REQUESTS_PER_THREAD = 100;
@@ -31,9 +36,10 @@ public class XrpcRequestConcurrencyTest {
         executor = Executors.newFixedThreadPool(THREAD_COUNT);
     }
     
-    @Test
+    @ParameterizedTest
+    @ValueSource(ints = {10, 20, 30})
     @Timeout(TIMEOUT_SECONDS)
-    public void testConcurrentXrpcRequests() throws InterruptedException {
+    public void testConcurrentXrpcRequests(int threadCount) throws InterruptedException {
         // Mock server and client interactions
         when(mockClient.getServer()).thenReturn(mockServer);
         when(mockClient.query()).thenReturn(true);
@@ -41,9 +47,9 @@ public class XrpcRequestConcurrencyTest {
         when(mockClient.subscription()).thenReturn(true);
         when(mockClient.notification()).thenReturn(true);
         
-        CountDownLatch latch = new CountDownLatch(THREAD_COUNT);
+        CountDownLatch latch = new CountDownLatch(threadCount);
         
-        for (int i = 0; i < THREAD_COUNT; i++) {
+        for (int i = 0; i < threadCount; i++) {
             executor.submit(() -> {
                 try {
                     testXrpcOperations(mockClient);
@@ -55,16 +61,21 @@ public class XrpcRequestConcurrencyTest {
         
         latch.await();
         
-        // Verify all operations were called the correct number of times
-        verify(mockClient, times(THREAD_COUNT * REQUESTS_PER_THREAD)).query();
-        verify(mockClient, times(THREAD_COUNT * REQUESTS_PER_THREAD)).procedure();
-        verify(mockClient, times(THREAD_COUNT * REQUESTS_PER_THREAD)).subscription();
-        verify(mockClient, times(THREAD_COUNT * REQUESTS_PER_THREAD)).notification();
+        // Verify using AssertJ for better assertions
+        Assertions.assertThat(mockClient)
+            .isNotNull()
+            .hasFieldOrProperty("serverConnection");
+        
+        verify(mockClient, times(threadCount * REQUESTS_PER_THREAD)).query();
+        verify(mockClient, times(threadCount * REQUESTS_PER_THREAD)).procedure();
+        verify(mockClient, times(threadCount * REQUESTS_PER_THREAD)).subscription();
+        verify(mockClient, times(threadCount * REQUESTS_PER_THREAD)).notification();
     }
     
-    @Test
+    @ParameterizedTest
+    @ValueSource(ints = {50, 100, 150})
     @Timeout(TIMEOUT_SECONDS)
-    public void testXrpcRequestRateLimiting() throws InterruptedException {
+    public void testXrpcRequestRateLimiting(int rateLimit) throws InterruptedException {
         // Mock rate limiting behavior
         when(mockClient.getServer()).thenReturn(mockServer);
         when(mockClient.query()).thenThrow(new RuntimeException("rate limit exceeded"));
@@ -75,7 +86,7 @@ public class XrpcRequestConcurrencyTest {
         for (int i = 0; i < THREAD_COUNT; i++) {
             executor.submit(() -> {
                 try {
-                    testRateLimiting(mockClient);
+                    testRateLimiting(mockClient, rateLimit);
                 } finally {
                     latch.countDown();
                 }
@@ -85,8 +96,8 @@ public class XrpcRequestConcurrencyTest {
         latch.await();
         
         // Verify rate limiting was enforced
-        verify(mockClient, times(THREAD_COUNT * 100)).query(); // 100 is the mock rate limit
-        verify(mockClient, times(THREAD_COUNT * 50)).procedure(); // 50 is the mock rate limit
+        verify(mockClient, times(THREAD_COUNT * rateLimit)).query();
+        verify(mockClient, times(THREAD_COUNT * (rateLimit / 2))).procedure();
     }
     
     private void testXrpcOperations(XrpcClient client) {
@@ -98,22 +109,24 @@ public class XrpcRequestConcurrencyTest {
         }
     }
     
-    private void testRateLimiting(XrpcClient client) {
+    private void testRateLimiting(XrpcClient client, int rateLimit) {
         // Test query rate limiting
-        for (int i = 0; i < 100; i++) {
+        for (int i = 0; i < rateLimit; i++) {
             try {
                 client.query();
             } catch (Exception e) {
-                assertTrue(e.getMessage().contains("rate limit"));
+                Assertions.assertThat(e.getMessage())
+                    .contains("rate limit");
             }
         }
         
         // Test procedure rate limiting
-        for (int i = 0; i < 50; i++) {
+        for (int i = 0; i < rateLimit / 2; i++) {
             try {
                 client.procedure();
             } catch (Exception e) {
-                assertTrue(e.getMessage().contains("rate limit"));
+                Assertions.assertThat(e.getMessage())
+                    .contains("rate limit");
             }
         }
     }

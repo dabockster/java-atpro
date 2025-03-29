@@ -18,27 +18,82 @@ import java.util.stream.Stream;
 import java.util.HashMap; // Ensure HashMap is imported
 import com.atproto.common.Cid; // Import Cid if not already present
 
-
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
+import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
+import org.junit.jupiter.params.provider.MethodSource;
+import org.mockito.Mock;
+import org.mockito.junit.jupiter.MockitoExtension;
+import org.mockito.junit.jupiter.MockitoSettings;
+import org.mockito.quality.Strictness;
+import org.assertj.core.api.Assertions;
+import org.powermock.api.mockito.PowerMockito;
+import org.powermock.core.classloader.annotations.PrepareForTest;
+import org.owasp.dependencycheck.utils.DependencyCheckException;
 
+import static org.mockito.Mockito.when;
+
+@ExtendWith(MockitoExtension.class)
+@MockitoSettings(strictness = Strictness.LENIENT)
+@PrepareForTest({TestUtils.class})
 public class TestUtils {
-        public static LexiconDoc createLexiconWithParams(String id,
+    @Mock
+    private JavaCompiler compilerMock;
+
+    @Mock
+    private JavaFileManager fileManagerMock;
+
+    @BeforeEach
+    public void setUp() {
+        PowerMockito.mockStatic(ToolProvider.class);
+        PowerMockito.when(ToolProvider.getSystemJavaCompiler()).thenReturn(compilerMock);
+    }
+
+    @ParameterizedTest
+    @MethodSource("provideLexiconParams")
+    public void testCreateLexiconWithParams(String id, Map<String, ? extends LexType> params) {
+        LexiconDoc doc = createLexiconWithParams(id, params);
+        Assertions.assertThat(doc).isNotNull();
+        Assertions.assertThat(doc.getId()).isEqualTo(id);
+        Assertions.assertThat(doc.getDefinitions()).isNotEmpty();
+    }
+
+    private static Stream<Arguments> provideLexiconParams() {
+        return Stream.of(
+            Arguments.of("com.example.test", new HashMap<>()),
+            Arguments.of("com.example.test2", Map.of("param1", new LexString()))
+        );
+    }
+
+    @Test
+    public void testInMemoryCompiler() throws Exception {
+        String className = "TestClass";
+        String sourceCode = "public class TestClass { public void test() {} }";
+
+        Class<?> compiledClass = InMemoryCompiler.compile(className, sourceCode);
+        Assertions.assertThat(compiledClass).isNotNull();
+        Assertions.assertThat(compiledClass.getName()).isEqualTo(className);
+    }
+
+    public static LexiconDoc createLexiconWithParams(String id,
                         Map<String, ? extends LexType> params) {
-                List<LexDefinition> defs = new ArrayList<>();
-                LexXrpcParameters xrpcParams = new LexObject(Optional.of("params"),
+        List<LexDefinition> defs = new ArrayList<>();
+        LexXrpcParameters xrpcParams = new LexObject(Optional.of("params"),
                                 Optional.empty(), params, new ArrayList<>());
-                LexXrpcBody output = new LexXrpcBody("application/json", Optional.empty(),
+        LexXrpcBody output = new LexXrpcBody("application/json", Optional.empty(),
                                 Optional.empty());
-                LexXrpcQuery query = new LexXrpcQuery(Optional.of(xrpcParams), Optional.empty(),
+        LexXrpcQuery query = new LexXrpcQuery(Optional.of(xrpcParams), Optional.empty(),
                                 Optional.empty(), Optional.of(output), new ArrayList<>());
-                defs.add(new LexDefinition("main", "query", query));
-                return new LexiconDoc(1, id, Optional.of(0), Optional.empty(),
+        defs.add(new LexDefinition("main", "query", query));
+        return new LexiconDoc(1, id, Optional.of(0), Optional.empty(),
                                 defs.stream().collect(java.util.stream.Collectors.toMap(
                                                 LexDefinition::getId,
                                                 java.util.function.Function.identity())));
-        }
+    }
 
-        public static class InMemoryCompiler {
+    public static class InMemoryCompiler {
                 private static final JavaCompiler compiler = ToolProvider.getSystemJavaCompiler();
 
                 public static Class<?> compile(String className, String sourceCode)

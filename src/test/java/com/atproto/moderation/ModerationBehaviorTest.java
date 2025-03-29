@@ -15,7 +15,7 @@ import java.time.Instant;
 import java.util.List;
 import java.util.Map;
 
-import static org.junit.jupiter.api.Assertions.*;
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.when;
 
@@ -53,8 +53,10 @@ class ModerationBehaviorTest {
             List.of(createLabel(TEST_LABEL, TEST_LABELER, "hide"))
         );
 
-        assertTrue(result.isModerated());
-        assertTrue(result.getActions().contains(ModerationAction.HIDE));
+        assertThat(result).isNotNull()
+            .extracting(ModerationResult::isModerated)
+            .isTrue();
+        assertThat(result.getActions()).contains(ModerationAction.HIDE);
     }
 
     @Test
@@ -64,8 +66,10 @@ class ModerationBehaviorTest {
             List.of(createLabel(TEST_LABEL, TEST_LABELER, "ignore"))
         );
 
-        assertFalse(result.isModerated());
-        assertTrue(result.getActions().isEmpty());
+        assertThat(result).isNotNull()
+            .extracting(ModerationResult::isModerated)
+            .isFalse();
+        assertThat(result.getActions()).isEmpty();
     }
 
     @Test
@@ -77,8 +81,10 @@ class ModerationBehaviorTest {
 
         ModerationResult result = moderationService.applyModeration(TEST_DID, labels);
 
-        assertTrue(result.isModerated());
-        assertTrue(result.getActions().contains(ModerationAction.HIDE));
+        assertThat(result).isNotNull()
+            .extracting(ModerationResult::isModerated)
+            .isTrue();
+        assertThat(result.getActions()).contains(ModerationAction.HIDE);
     }
 
     @Test
@@ -90,8 +96,10 @@ class ModerationBehaviorTest {
 
         ModerationResult result = moderationService.applyModeration(TEST_DID, labels);
 
-        assertFalse(result.isModerated());
-        assertTrue(result.getActions().isEmpty());
+        assertThat(result).isNotNull()
+            .extracting(ModerationResult::isModerated)
+            .isFalse();
+        assertThat(result.getActions()).isEmpty();
     }
 
     @Test
@@ -102,8 +110,10 @@ class ModerationBehaviorTest {
             false  // adultContentEnabled = false
         );
 
-        assertTrue(result.isModerated());
-        assertTrue(result.getActions().contains(ModerationAction.HIDE));
+        assertThat(result).isNotNull()
+            .extracting(ModerationResult::isModerated)
+            .isTrue();
+        assertThat(result.getActions()).contains(ModerationAction.HIDE);
     }
 
     private LexiconLabel createLabel(String label, String labeler, String behavior) {

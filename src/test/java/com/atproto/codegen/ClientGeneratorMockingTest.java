@@ -1,20 +1,18 @@
-// src/main/test/java/com/atproto/codegen/ClientGeneratorMockingTest.java
-
 package com.atproto.codegen;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.Mockito.*;
+import static org.assertj.core.api.Assertions.*;
 
 import com.atproto.api.AtpResponse;
 import com.atproto.api.xrpc.XrpcClient;
 import com.atproto.api.xrpc.XrpcException;
 import com.atproto.lexicon.models.*;
-import com.atproto.common.Cid; // Import Cid
-
+import com.atproto.common.Cid;
 import java.io.IOException;
 import java.lang.reflect.InvocationTargetException;
 import java.util.ArrayList;
-import java.util.HashMap; // Added for parameter map
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -26,8 +24,11 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentMatchers;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.mockito.stubbing.Answer;
+import org.mockito.verification.VerificationMode;
+import org.mockito.Mockito;
 
-@ExtendWith(MockitoExtension.class) // Use MockitoExtension for JUnit 5 integration
+@ExtendWith(MockitoExtension.class)
 public class ClientGeneratorMockingTest {
 
         @Mock

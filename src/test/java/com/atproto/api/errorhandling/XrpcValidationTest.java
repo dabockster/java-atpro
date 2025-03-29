@@ -8,11 +8,11 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.assertj.core.api.Assertions;
 
 import java.util.List;
 import java.util.Map;
 
-import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.*;
 
@@ -46,7 +46,7 @@ public class XrpcValidationTest {
         boolean isValid = validation.validateRequest(validParams);
 
         // Then
-        assertTrue(isValid);
+        Assertions.assertThat(isValid).isTrue();
         verify(schema).validateRequest(any());
     }
 
@@ -61,7 +61,15 @@ public class XrpcValidationTest {
         when(schema.validateRequest(any())).thenThrow(new XrpcException(400, "invalid_request", "Invalid parameters"));
 
         // When & Then
-        assertThrows(XrpcException.class, () -> validation.validateRequest(invalidParams));
+        XrpcException exception = Assertions.assertThatThrownBy(() -> validation.validateRequest(invalidParams))
+            .isInstanceOf(XrpcException.class)
+            .hasMessage("Invalid parameters")
+            .satisfies(e -> {
+                Assertions.assertThat(e.getStatusCode()).isEqualTo(400);
+                Assertions.assertThat(e.getCode()).isEqualTo("invalid_request");
+            });
+
+        verify(schema).validateRequest(any());
     }
 
     @Test
@@ -80,7 +88,7 @@ public class XrpcValidationTest {
         boolean isValid = validation.validateResponse(validResponse);
 
         // Then
-        assertTrue(isValid);
+        Assertions.assertThat(isValid).isTrue();
         verify(schema).validateResponse(any());
     }
 
@@ -96,16 +104,47 @@ public class XrpcValidationTest {
         when(schema.validateResponse(any())).thenThrow(new XrpcException(400, "invalid_response", "Invalid response format"));
 
         // When & Then
-        assertThrows(XrpcException.class, () -> validation.validateResponse(invalidResponse));
+        XrpcException exception = Assertions.assertThatThrownBy(() -> validation.validateResponse(invalidResponse))
+            .isInstanceOf(XrpcException.class)
+            .hasMessage("Invalid response format")
+            .satisfies(e -> {
+                Assertions.assertThat(e.getStatusCode()).isEqualTo(400);
+                Assertions.assertThat(e.getCode()).isEqualTo("invalid_response");
+            });
+
+        verify(schema).validateResponse(any());
     }
 
     @Test
-    public void shouldValidateNestedObjectStructure() throws XrpcException {
+    public void shouldValidateRequestWithArrayParameters() throws XrpcException {
         // Given
-        Map<String, Object> nestedParams = Map.of(
-            "outer", Map.of(
-                "inner", Map.of(
-                    "value", "valid"
+        Map<String, Object> requestWithArray = Map.of(
+            "ids", List.of("123", "456"),
+            "options", Map.of(
+                "limit", 50,
+                "offset", 0
+            )
+        );
+
+        when(schema.validateRequest(any())).thenReturn(true);
+
+        // When
+        boolean isValid = validation.validateRequest(requestWithArray);
+
+        // Then
+        Assertions.assertThat(isValid).isTrue();
+        verify(schema).validateRequest(any());
+    }
+
+    @Test
+    public void shouldValidateRequestWithNestedObjects() throws XrpcException {
+        // Given
+        Map<String, Object> requestWithNestedObjects = Map.of(
+            "user", Map.of(
+                "id", "123",
+                "profile", Map.of(
+                    "name", "John Doe",
+                    "bio", "Developer"
                 )
             )
         );
@@ -113,67 +152,51 @@ public class XrpcValidationTest {
         when(schema.validateRequest(any())).thenReturn(true);
 
         // When
-        boolean isValid = validation.validateRequest(nestedParams);
+        boolean isValid = validation.validateRequest(requestWithNestedObjects);
 
         // Then
-        assertTrue(isValid);
+        Assertions.assertThat(isValid).isTrue();
         verify(schema).validateRequest(any());
     }
 
     @Test
-    public void shouldValidateArrayStructure() throws XrpcException {
+    public void shouldValidateResponseWithPagination() throws XrpcException {
         // Given
-        Map<String, Object> arrayParams = Map.of(
-            "items", List.of(
-                Map.of("id", "1"),
-                Map.of("id", "2")
+        Map<String, Object> responseWithPagination = Map.of(
+            "data", List.of(
+                Map.of("id", "123", "value", "test1"),
+                Map.of("id", "456", "value", "test2")
+            ),
+            "cursor", "next_cursor_value"
+        );
+
+        when(schema.validateResponse(any())).thenReturn(true);
+
+        // When
+        boolean isValid = validation.validateResponse(responseWithPagination);
+
+        // Then
+        Assertions.assertThat(isValid).isTrue();
+        verify(schema).validateResponse(any());
+    }
+
+    @Test
+    public void shouldValidateResponseWithErrors() throws XrpcException {
+        // Given
+        Map<String, Object> responseWithErrors = Map.of(
+            "errors", List.of(
+                Map.of("code", "invalid_value", "message", "Invalid value provided"),
+                Map.of("code", "missing_field", "message", "Required field is missing")
             )
         );
 
-        when(schema.validateRequest(any())).thenReturn(true);
+        when(schema.validateResponse(any())).thenReturn(true);
 
         // When
-        boolean isValid = validation.validateRequest(arrayParams);
+        boolean isValid = validation.validateResponse(responseWithErrors);
 
         // Then
-        assertTrue(isValid);
-        verify(schema).validateRequest(any());
-    }
-
-    @Test
-    public void shouldValidateEnumValues() throws XrpcException {
-        // Given
-        Map<String, Object> enumParams = Map.of(
-            "status", "active"
-        );
-
-        when(schema.validateRequest(any())).thenReturn(true);
-
-        // When
-        boolean isValid = validation.validateRequest(enumParams);
-
-        // Then
-        assertTrue(isValid);
-        verify(schema).validateRequest(any());
-    }
-
-    @Test
-    public void shouldValidateCustomTypeStructure() throws XrpcException {
-        // Given
-        Map<String, Object> customTypeParams = Map.of(
-            "customType", Map.of(
-                "type", "custom",
-                "value", "123"
-            )
-        );
-
-        when(schema.validateRequest(any())).thenReturn(true);
-
-        // When
-        boolean isValid = validation.validateRequest(customTypeParams);
-
-        // Then
-        assertTrue(isValid);
-        verify(schema).validateRequest(any());
+        Assertions.assertThat(isValid).isTrue();
+        verify(schema).validateResponse(any());
     }
 }

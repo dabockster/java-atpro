@@ -3,6 +3,7 @@ package com.atproto.repository;
 import com.atproto.repository.Repository;
 import com.atproto.repository.Version;
 import com.atproto.syntax.Cid;
+import org.assertj.core.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
@@ -12,7 +13,9 @@ import java.io.IOException;
 import java.nio.file.Path;
 import java.util.HashMap;
 import java.util.Map;
-import static org.junit.jupiter.api.Assertions.*;
+
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.*;
@@ -39,9 +42,9 @@ public class RepositoryIntegrityTest {
         // When
         
         // Then
-        assertTrue(repository.isInitialized());
-        assertNotNull(repository.getLatestVersion());
-        assertNotNull(repository.getRootCid());
+        assertThat(repository.isInitialized()).isTrue();
+        assertThat(repository.getLatestVersion()).isNotNull();
+        assertThat(repository.getRootCid()).isNotNull();
     }
     
     @Test
@@ -54,18 +57,18 @@ public class RepositoryIntegrityTest {
         String recordPath = "com.example.record";
         byte[] recordData = "test data".getBytes();
         Cid recordCid = new Cid("testCid");
-        when(repository.putRecord(anyString(), any(byte[].class))).thenReturn(recordCid);
+        when(repository.putRecord(eq(recordPath), eq(recordData))).thenReturn(recordCid);
         
         // Then
         Version newVersion = new Version();
         when(repository.getLatestVersion()).thenReturn(newVersion);
-        assertNotEquals(initialVersion, newVersion);
+        assertThat(newVersion).isNotEqualTo(initialVersion);
+        
         Map<String, Cid> records = new HashMap<>();
         records.put(recordPath, recordCid);
         when(repository.getRecords()).thenReturn(records);
         Map<String, Cid> actualRecords = repository.getRecords();
-        assertTrue(actualRecords.containsKey(recordPath));
-        assertEquals(recordCid, actualRecords.get(recordPath));
+        assertThat(actualRecords).containsEntry(recordPath, recordCid);
     }
     
     @Test
@@ -79,8 +82,8 @@ public class RepositoryIntegrityTest {
         Cid cid1 = new Cid("cid1");
         Cid cid2 = new Cid("cid2");
         
-        when(repository.putRecord(eq(path1), any(byte[].class))).thenReturn(cid1);
-        when(repository.putRecord(eq(path2), any(byte[].class))).thenReturn(cid2);
+        when(repository.putRecord(eq(path1), eq(data1))).thenReturn(cid1);
+        when(repository.putRecord(eq(path2), eq(data2))).thenReturn(cid2);
         
         // When
         
@@ -90,8 +93,8 @@ public class RepositoryIntegrityTest {
         records.put(path2, cid2);
         when(repository.getRecords()).thenReturn(records);
         Map<String, Cid> actualRecords = repository.getRecords();
-        assertEquals(cid1, actualRecords.get(path1));
-        assertEquals(cid2, actualRecords.get(path2));
+        assertThat(actualRecords).containsEntry(path1, cid1);
+        assertThat(actualRecords).containsEntry(path2, cid2);
     }
     
     @Test
@@ -103,16 +106,43 @@ public class RepositoryIntegrityTest {
         // When
         String recordPath = "com.example.record";
         byte[] recordData = "test data".getBytes();
-        doNothing().when(repository).rollbackToVersion(eq(initialVersion));
+        Cid recordCid = new Cid("testCid");
+        when(repository.putRecord(eq(recordPath), eq(recordData))).thenReturn(recordCid);
         
         // Then
-        repository.rollbackToVersion(initialVersion);
-        verify(repository).rollbackToVersion(initialVersion);
-        when(repository.getLatestVersion()).thenReturn(initialVersion);
+        Version newVersion = new Version();
+        when(repository.getLatestVersion()).thenReturn(newVersion);
+        assertThat(newVersion).isNotEqualTo(initialVersion);
+        
         Map<String, Cid> records = new HashMap<>();
+        records.put(recordPath, recordCid);
         when(repository.getRecords()).thenReturn(records);
-        assertEquals(initialVersion, repository.getLatestVersion());
         Map<String, Cid> actualRecords = repository.getRecords();
-        assertFalse(actualRecords.containsKey(recordPath));
+        assertThat(actualRecords).containsEntry(recordPath, recordCid);
+        
+        // And: Rollback should restore initial state
+        doNothing().when(repository).rollbackToVersion(eq(initialVersion));
+        repository.rollbackToVersion(initialVersion);
+        
+        Version postRollbackVersion = repository.getLatestVersion();
+        assertThat(postRollbackVersion).isEqualTo(initialVersion);
+        
+        Map<String, Cid> postRollbackRecords = repository.getRecords();
+        assertThat(postRollbackRecords).isEmpty();
+    }
+    
+    @Test
+    void shouldHandleCorruptedRepository() throws IOException {
+        // Given
+        when(repository.isInitialized()).thenReturn(true);
+        when(repository.getLatestVersion()).thenReturn(new Version());
+        
+        // When: Corrupt the repository
+        doThrow(new IOException("Corrupted repository")).when(repository).verifyIntegrity();
+        
+        // Then: Should throw appropriate exception
+        assertThatThrownBy(() -> repository.verifyIntegrity())
+            .isInstanceOf(IOException.class)
+            .hasMessageContaining("Corrupted repository");
     }
 }

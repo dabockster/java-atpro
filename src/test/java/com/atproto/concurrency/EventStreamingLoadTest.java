@@ -3,7 +3,11 @@ package com.atproto.concurrency;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.Timeout;
-import org.mockito.Mockito;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
+import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.junit.jupiter.MockitoExtension;
+import org.assertj.core.api.Assertions;
 
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutorService;
@@ -14,6 +18,7 @@ import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.*;
 
+@ExtendWith(MockitoExtension.class)
 public class EventStreamingLoadTest {
     private static final int THREAD_COUNT = 20;
     private static final int SUBSCRIPTIONS_PER_THREAD = 5;
@@ -26,14 +31,15 @@ public class EventStreamingLoadTest {
         eventManager = mock(EventManager.class);
     }
 
-    @Test
+    @ParameterizedTest
+    @ValueSource(ints = {10, 20, 30})
     @Timeout(60)
-    public void testEventStreamingUnderLoad() throws InterruptedException {
-        ExecutorService executor = Executors.newFixedThreadPool(THREAD_COUNT);
-        CountDownLatch latch = new CountDownLatch(THREAD_COUNT);
+    public void testEventStreamingUnderLoad(int threadCount) throws InterruptedException {
+        ExecutorService executor = Executors.newFixedThreadPool(threadCount);
+        CountDownLatch latch = new CountDownLatch(threadCount);
         
         try {
-            for (int i = 0; i < THREAD_COUNT; i++) {
+            for (int i = 0; i < threadCount; i++) {
                 executor.submit(() -> {
                     try {
                         testEventStreaming(eventManager);
@@ -45,6 +51,12 @@ public class EventStreamingLoadTest {
             }
             
             latch.await();
+            
+            // Verify using AssertJ for better assertions
+            Assertions.assertThat(eventManager)
+                .isNotNull()
+                .hasFieldOrProperty("eventQueue");
+            
         } finally {
             executor.shutdown();
         }
@@ -76,9 +88,10 @@ public class EventStreamingLoadTest {
         verify(eventManager, times(SUBSCRIPTIONS_PER_THREAD)).deleteSubscription(any(String.class));
     }
 
-    @Test
+    @ParameterizedTest
+    @ValueSource(ints = {1000, 5000, 10000})
     @Timeout(60)
-    public void testEventBatchProcessing() throws InterruptedException {
+    public void testEventBatchProcessing(int batchSize) throws InterruptedException {
         ExecutorService executor = Executors.newFixedThreadPool(THREAD_COUNT);
         CountDownLatch latch = new CountDownLatch(THREAD_COUNT);
         
@@ -86,8 +99,8 @@ public class EventStreamingLoadTest {
             for (int i = 0; i < THREAD_COUNT; i++) {
                 executor.submit(() -> {
                     try {
-                        testBatchProcessing(eventManager);
-                        verifyBatchProcessingOperations(eventManager);
+                        testBatchProcessing(eventManager, batchSize);
+                        verifyBatchProcessingOperations(eventManager, batchSize);
                     } finally {
                         latch.countDown();
                     }
@@ -95,14 +108,19 @@ public class EventStreamingLoadTest {
             }
             
             latch.await();
+            
+            // Verify using AssertJ for better assertions
+            Assertions.assertThat(eventManager)
+                .isNotNull()
+                .hasFieldOrProperty("batchProcessor");
+            
         } finally {
             executor.shutdown();
         }
     }
 
-    private void testBatchProcessing(EventManager eventManager) {
+    private void testBatchProcessing(EventManager eventManager, int batchSize) {
         String subscriptionId = "test-subscription";
-        int batchSize = 1000;
         
         // Test large batch processing
         eventManager.publishBatch(subscriptionId, batchSize);
@@ -114,10 +132,10 @@ public class EventStreamingLoadTest {
         eventManager.cleanupBatch(subscriptionId);
     }
 
-    private void verifyBatchProcessingOperations(EventManager eventManager) {
+    private void verifyBatchProcessingOperations(EventManager eventManager, int batchSize) {
         verify(eventManager).createSubscription();
-        verify(eventManager).publishBatch(any(String.class), eq(1000));
-        verify(eventManager).consumeBatch(any(String.class), eq(1000));
+        verify(eventManager).publishBatch(any(String.class), eq(batchSize));
+        verify(eventManager).consumeBatch(any(String.class), eq(batchSize));
         verify(eventManager).cleanupBatch(any(String.class));
     }
 }

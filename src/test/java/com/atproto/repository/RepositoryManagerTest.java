@@ -1,5 +1,6 @@
 package com.atproto.repository;
 
+import org.assertj.core.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -11,7 +12,8 @@ import java.io.IOException;
 import java.util.HashMap;
 import java.util.Map;
 
-import static org.junit.jupiter.api.Assertions.*;
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
@@ -34,14 +36,17 @@ public class RepositoryManagerTest {
     @Test
     public void testRepositoryCreation() throws IOException {
         // Test creating a new repository
-        assertTrue(repositoryManager.createRepository(TEST_REPO_ID));
+        when(carFileHandler.repositoryExists(TEST_REPO_ID)).thenReturn(false);
+        assertThat(repositoryManager.createRepository(TEST_REPO_ID)).isTrue();
 
         // Test creating repository with invalid DID
-        assertFalse(repositoryManager.createRepository("invalid:did"));
+        assertThatThrownBy(() -> repositoryManager.createRepository("invalid:did"))
+            .isInstanceOf(IllegalArgumentException.class)
+            .hasMessageContaining("Invalid DID format");
 
         // Test creating repository that already exists
         when(carFileHandler.repositoryExists(TEST_REPO_ID)).thenReturn(true);
-        assertFalse(repositoryManager.createRepository(TEST_REPO_ID));
+        assertThat(repositoryManager.createRepository(TEST_REPO_ID)).isFalse();
     }
 
     @Test
@@ -49,59 +54,74 @@ public class RepositoryManagerTest {
         // Test adding a record
         Map<String, Object> recordData = new HashMap<>();
         recordData.put("text", "Test record");
-        assertTrue(repositoryManager.addRecord(TEST_REPO_ID, TEST_RECORD_ID, recordData));
+        
+        when(carFileHandler.addRecord(TEST_REPO_ID, TEST_RECORD_ID, recordData)).thenReturn(true);
+        assertThat(repositoryManager.addRecord(TEST_REPO_ID, TEST_RECORD_ID, recordData)).isTrue();
 
         // Test getting a record
+        when(carFileHandler.getRecord(TEST_REPO_ID, TEST_RECORD_ID)).thenReturn(recordData);
         Map<String, Object> retrievedRecord = repositoryManager.getRecord(TEST_REPO_ID, TEST_RECORD_ID);
-        assertNotNull(retrievedRecord);
-        assertEquals("Test record", retrievedRecord.get("text"));
+        assertThat(retrievedRecord).isNotNull();
+        assertThat(retrievedRecord.get("text")).isEqualTo("Test record");
 
         // Test updating a record
         Map<String, Object> updatedData = new HashMap<>();
         updatedData.put("text", "Updated record");
-        assertTrue(repositoryManager.updateRecord(TEST_REPO_ID, TEST_RECORD_ID, updatedData));
+        
+        when(carFileHandler.updateRecord(TEST_REPO_ID, TEST_RECORD_ID, updatedData)).thenReturn(true);
+        assertThat(repositoryManager.updateRecord(TEST_REPO_ID, TEST_RECORD_ID, updatedData)).isTrue();
 
         // Test getting updated record
+        when(carFileHandler.getRecord(TEST_REPO_ID, TEST_RECORD_ID)).thenReturn(updatedData);
         Map<String, Object> updatedRecord = repositoryManager.getRecord(TEST_REPO_ID, TEST_RECORD_ID);
-        assertNotNull(updatedRecord);
-        assertEquals("Updated record", updatedRecord.get("text"));
+        assertThat(updatedRecord).isNotNull();
+        assertThat(updatedRecord.get("text")).isEqualTo("Updated record");
 
         // Test deleting a record
-        assertTrue(repositoryManager.deleteRecord(TEST_REPO_ID, TEST_RECORD_ID));
-        assertNull(repositoryManager.getRecord(TEST_REPO_ID, TEST_RECORD_ID));
+        when(carFileHandler.deleteRecord(TEST_REPO_ID, TEST_RECORD_ID)).thenReturn(true);
+        assertThat(repositoryManager.deleteRecord(TEST_REPO_ID, TEST_RECORD_ID)).isTrue();
+        
+        when(carFileHandler.getRecord(TEST_REPO_ID, TEST_RECORD_ID)).thenReturn(null);
+        assertThat(repositoryManager.getRecord(TEST_REPO_ID, TEST_RECORD_ID)).isNull();
     }
 
     @Test
     public void testRepositorySync() throws IOException {
         // Test syncing repository
-        assertTrue(repositoryManager.syncRepository(TEST_REPO_ID));
+        when(carFileHandler.syncRepository(TEST_REPO_ID)).thenReturn(true);
+        assertThat(repositoryManager.syncRepository(TEST_REPO_ID)).isTrue();
 
         // Test syncing non-existent repository
         when(carFileHandler.repositoryExists("nonexistent:did")).thenReturn(false);
-        assertFalse(repositoryManager.syncRepository("nonexistent:did"));
+        assertThat(repositoryManager.syncRepository("nonexistent:did")).isFalse();
 
         // Test syncing with conflicts
         when(carFileHandler.hasConflicts(TEST_REPO_ID)).thenReturn(true);
-        assertFalse(repositoryManager.syncRepository(TEST_REPO_ID));
+        assertThat(repositoryManager.syncRepository(TEST_REPO_ID)).isFalse();
     }
 
     @Test
     public void testErrorHandling() {
         // Test invalid DID format
-        assertThrows(IllegalArgumentException.class, () -> {
-            repositoryManager.createRepository("invalid:did");
-        });
+        assertThatThrownBy(() -> repositoryManager.createRepository("invalid:did"))
+            .isInstanceOf(IllegalArgumentException.class)
+            .hasMessageContaining("Invalid DID format");
 
         // Test non-existent repository
         when(carFileHandler.repositoryExists(TEST_REPO_ID)).thenReturn(false);
-        assertThrows(RepositoryNotFoundException.class, () -> {
-            repositoryManager.getRecord(TEST_REPO_ID, TEST_RECORD_ID);
-        });
+        assertThatThrownBy(() -> repositoryManager.getRecord(TEST_REPO_ID, TEST_RECORD_ID))
+            .isInstanceOf(RepositoryNotFoundException.class);
 
         // Test record not found
-        when(carFileHandler.recordExists(TEST_REPO_ID, TEST_RECORD_ID)).thenReturn(false);
-        assertThrows(RecordNotFoundException.class, () -> {
-            repositoryManager.getRecord(TEST_REPO_ID, TEST_RECORD_ID);
-        });
+        when(carFileHandler.getRecord(TEST_REPO_ID, TEST_RECORD_ID)).thenReturn(null);
+        assertThat(repositoryManager.getRecord(TEST_REPO_ID, TEST_RECORD_ID)).isNull();
+
+        // Test invalid record data
+        Map<String, Object> invalidData = new HashMap<>();
+        invalidData.put("text", new Object()); // Invalid type
+        
+        assertThatThrownBy(() -> repositoryManager.addRecord(TEST_REPO_ID, TEST_RECORD_ID, invalidData))
+            .isInstanceOf(IllegalArgumentException.class)
+            .hasMessageContaining("Invalid record data");
     }
 }

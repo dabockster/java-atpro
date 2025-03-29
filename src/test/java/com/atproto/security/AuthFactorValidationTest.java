@@ -2,6 +2,8 @@ package com.atproto.security;
 
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
@@ -9,7 +11,8 @@ import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.time.Instant;
 
-import static org.junit.jupiter.api.Assertions.*;
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.when;
 
@@ -33,56 +36,54 @@ class AuthFactorValidationTest {
     }
 
     @Test
-    void testValidAuthFactor() throws Exception {
-        assertTrue(validator.validateAuthFactor(VALID_AUTH_FACTOR_TOKEN));
+    void testValidAuthFactor() {
+        assertThat(validator.validateAuthFactor(VALID_AUTH_FACTOR_TOKEN)).isTrue();
     }
 
     @Test
-    void testInvalidAuthFactor() throws Exception {
-        assertFalse(validator.validateAuthFactor(INVALID_AUTH_FACTOR_TOKEN));
+    void testInvalidAuthFactor() {
+        assertThat(validator.validateAuthFactor(INVALID_AUTH_FACTOR_TOKEN)).isFalse();
     }
 
-    @Test
-    void testExpiredAuthFactor() throws Exception {
-        String expiredToken = "expired-token";
-        
+    @ParameterizedTest
+    @ValueSource(strings = {"expired-token", "expired-123", "expired-456"})
+    void testExpiredAuthFactor(String expiredToken) {
         when(validator.validateAuthFactor(expiredToken))
             .thenReturn(false);
 
-        assertFalse(validator.validateAuthFactor(expiredToken));
+        assertThat(validator.validateAuthFactor(expiredToken)).isFalse();
     }
 
-    @Test
-    void testSingleUseAuthFactor() throws Exception {
-        String token = "single-use-token";
-
+    @ParameterizedTest
+    @ValueSource(strings = {"single-use-token", "one-time-use", "use-once"})
+    void testSingleUseAuthFactor(String token) {
         // First use should succeed
         when(validator.validateAuthFactor(token))
             .thenReturn(true);
 
-        assertTrue(validator.validateAuthFactor(token));
+        assertThat(validator.validateAuthFactor(token)).isTrue();
 
         // Second use should fail (single-use token)
         when(validator.validateAuthFactor(token))
             .thenReturn(false);
 
-        assertFalse(validator.validateAuthFactor(token));
+        assertThat(validator.validateAuthFactor(token)).isFalse();
     }
 
     @Test
-    void testAuthFactorRateLimiting() throws Exception {
+    void testAuthFactorRateLimiting() {
         // Mock rate limiting behavior
         when(validator.generateAuthFactorToken(any(String.class), any(Instant.class)))
             .thenThrow(new SecurityException("Rate limit exceeded"));
 
-        // Should throw rate limit exception
-        assertThrows(SecurityException.class, () ->
+        assertThatThrownBy(() ->
             validator.generateAuthFactorToken(TEST_DID, Instant.now().plusSeconds(3600))
-        );
+        ).isInstanceOf(SecurityException.class)
+          .hasMessage("Rate limit exceeded");
     }
 
     @Test
-    void testAuthFactorCleanup() throws Exception {
+    void testAuthFactorCleanup() {
         // Mock cleanup behavior
         when(validator.cleanupExpiredAuthFactors())
             .thenReturn(100);
@@ -90,6 +91,27 @@ class AuthFactorValidationTest {
         // Clean up expired tokens
         int cleaned = validator.cleanupExpiredAuthFactors();
 
-        assertTrue(cleaned >= 100);
+        assertThat(cleaned).isGreaterThanOrEqualTo(100);
+    }
+
+    @Test
+    void testAuthFactorTokenGeneration() {
+        when(validator.generateAuthFactorToken(TEST_DID, Instant.now().plusSeconds(3600)))
+            .thenReturn(VALID_AUTH_FACTOR_TOKEN);
+
+        String token = validator.generateAuthFactorToken(TEST_DID, Instant.now().plusSeconds(3600));
+        assertThat(token).isEqualTo(VALID_AUTH_FACTOR_TOKEN);
+    }
+
+    @Test
+    void testMultipleAuthFactors() {
+        String token1 = "token1";
+        String token2 = "token2";
+        
+        when(validator.validateAuthFactor(token1)).thenReturn(true);
+        when(validator.validateAuthFactor(token2)).thenReturn(true);
+        
+        assertThat(validator.validateAuthFactor(token1)).isTrue();
+        assertThat(validator.validateAuthFactor(token2)).isTrue();
     }
 }

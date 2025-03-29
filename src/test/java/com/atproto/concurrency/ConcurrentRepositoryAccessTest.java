@@ -4,9 +4,14 @@ import com.atproto.repository.RepositoryManager;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.Timeout;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.mockito.Mock;
 import org.mockito.Mockito;
 import org.mockito.MockitoAnnotations;
+import org.mockito.junit.jupiter.MockitoExtension;
+import org.junit.jupiter.api.extension.ExtendWith;
+import org.assertj.core.api.Assertions;
 
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutorService;
@@ -15,6 +20,7 @@ import java.util.concurrent.Executors;
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.Mockito.*;
 
+@ExtendWith(MockitoExtension.class)
 public class ConcurrentRepositoryAccessTest {
     private static final int THREAD_COUNT = 20;
     private static final int ITERATIONS = 100;
@@ -27,14 +33,15 @@ public class ConcurrentRepositoryAccessTest {
         MockitoAnnotations.openMocks(this);
     }
 
-    @Test
+    @ParameterizedTest
+    @ValueSource(ints = {10, 20, 30})
     @Timeout(30)
-    public void testConcurrentRepositoryAccess() throws InterruptedException {
-        ExecutorService executor = Executors.newFixedThreadPool(THREAD_COUNT);
-        CountDownLatch latch = new CountDownLatch(THREAD_COUNT);
+    public void testConcurrentRepositoryAccess(int threadCount) throws InterruptedException {
+        ExecutorService executor = Executors.newFixedThreadPool(threadCount);
+        CountDownLatch latch = new CountDownLatch(threadCount);
         
         try {
-            for (int i = 0; i < THREAD_COUNT; i++) {
+            for (int i = 0; i < threadCount; i++) {
                 executor.submit(() -> {
                     try {
                         testRepositoryOperations(repositoryManager);
@@ -46,11 +53,15 @@ public class ConcurrentRepositoryAccessTest {
             
             latch.await();
             
-            // Verify that all operations were called the expected number of times
-            verify(repositoryManager, times(THREAD_COUNT * ITERATIONS)).getRepositoryState();
-            verify(repositoryManager, times(THREAD_COUNT * ITERATIONS)).updateRepositoryState();
-            verify(repositoryManager, times(THREAD_COUNT * ITERATIONS)).uploadBlob();
-            verify(repositoryManager, times(THREAD_COUNT * ITERATIONS)).downloadBlob();
+            // Verify using AssertJ for better assertions
+            Assertions.assertThat(repositoryManager)
+                .isNotNull()
+                .hasFieldOrProperty("repositoryState");
+            
+            verify(repositoryManager, times(threadCount * ITERATIONS)).getRepositoryState();
+            verify(repositoryManager, times(threadCount * ITERATIONS)).updateRepositoryState();
+            verify(repositoryManager, times(threadCount * ITERATIONS)).uploadBlob();
+            verify(repositoryManager, times(threadCount * ITERATIONS)).downloadBlob();
         } finally {
             executor.shutdown();
         }
@@ -70,14 +81,15 @@ public class ConcurrentRepositoryAccessTest {
         }
     }
 
-    @Test
+    @ParameterizedTest
+    @ValueSource(ints = {10, 20, 30})
     @Timeout(30)
-    public void testRepositorySyncConcurrency() throws InterruptedException {
-        ExecutorService executor = Executors.newFixedThreadPool(THREAD_COUNT);
-        CountDownLatch latch = new CountDownLatch(THREAD_COUNT);
+    public void testRepositorySyncConcurrency(int threadCount) throws InterruptedException {
+        ExecutorService executor = Executors.newFixedThreadPool(threadCount);
+        CountDownLatch latch = new CountDownLatch(threadCount);
         
         try {
-            for (int i = 0; i < THREAD_COUNT; i++) {
+            for (int i = 0; i < threadCount; i++) {
                 executor.submit(() -> {
                     try {
                         testRepositorySyncOperations(repositoryManager);
@@ -89,10 +101,14 @@ public class ConcurrentRepositoryAccessTest {
             
             latch.await();
             
-            // Verify that all operations were called the expected number of times
-            verify(repositoryManager, times(THREAD_COUNT * ITERATIONS)).syncRepository();
-            verify(repositoryManager, times(THREAD_COUNT * ITERATIONS)).createCommit();
-            verify(repositoryManager, times(THREAD_COUNT * ITERATIONS)).getLatestCommit();
+            // Verify using AssertJ for better assertions
+            Assertions.assertThat(repositoryManager)
+                .isNotNull()
+                .hasFieldOrProperty("commitHistory");
+            
+            verify(repositoryManager, times(threadCount * ITERATIONS)).syncRepository();
+            verify(repositoryManager, times(threadCount * ITERATIONS)).createCommit();
+            verify(repositoryManager, times(threadCount * ITERATIONS)).getLatestCommit();
         } finally {
             executor.shutdown();
         }

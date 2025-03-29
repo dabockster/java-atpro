@@ -2,6 +2,8 @@ package com.atproto.security;
 
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
@@ -9,7 +11,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import java.time.Duration;
 import java.time.Instant;
 
-import static org.junit.jupiter.api.Assertions.*;
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.*;
 
@@ -25,48 +27,41 @@ class RateLimitingTest {
 
     @BeforeEach
     void setUp() {
-        // Reset mocks before each test
         reset(rateLimiter);
     }
 
     @Test
     void testInitialRateLimiting() {
-        // Test that a new client starts with no rate limiting
         when(rateLimiter.canMakeRequest(TEST_CLIENT_ID)).thenReturn(true);
-        assertTrue(rateLimiter.canMakeRequest(TEST_CLIENT_ID));
+        assertThat(rateLimiter.canMakeRequest(TEST_CLIENT_ID)).isTrue();
     }
 
     @Test
     void testRateLimitExceeded() {
-        // Test that rate limit is enforced after reaching max requests
         when(rateLimiter.getRequestCount(TEST_CLIENT_ID)).thenReturn(MAX_REQUESTS);
-        assertFalse(rateLimiter.canMakeRequest(TEST_CLIENT_ID));
+        assertThat(rateLimiter.canMakeRequest(TEST_CLIENT_ID)).isFalse();
     }
 
     @Test
     void testRateLimitReset() {
-        // Test that rate limit resets after window duration
         when(rateLimiter.getRequestCount(TEST_CLIENT_ID)).thenReturn(MAX_REQUESTS);
-        when(rateLimiter.getLastRequestTime(TEST_CLIENT_ID)).thenReturn(Instant.now().minus(WINDOW_DURATION).minusSeconds(1));
-        assertTrue(rateLimiter.canMakeRequest(TEST_CLIENT_ID));
+        when(rateLimiter.getLastRequestTime(TEST_CLIENT_ID))
+            .thenReturn(Instant.now().minus(WINDOW_DURATION).minusSeconds(1));
+        assertThat(rateLimiter.canMakeRequest(TEST_CLIENT_ID)).isTrue();
     }
 
-    @Test
-    void testMultipleClients() {
-        // Test that rate limits are tracked per client
-        String client1 = "client1";
-        String client2 = "client2";
+    @ParameterizedTest
+    @ValueSource(strings = {"client1", "client2", "client3"})
+    void testMultipleClients(String clientId) {
+        // Set up different request counts for each client
+        when(rateLimiter.getRequestCount(clientId)).thenReturn(clientId.equals("client1") ? MAX_REQUESTS : 0);
         
-        when(rateLimiter.getRequestCount(client1)).thenReturn(MAX_REQUESTS);
-        when(rateLimiter.getRequestCount(client2)).thenReturn(0);
-        
-        assertFalse(rateLimiter.canMakeRequest(client1));
-        assertTrue(rateLimiter.canMakeRequest(client2));
+        assertThat(rateLimiter.canMakeRequest(clientId))
+            .isEqualTo(!clientId.equals("client1"));
     }
 
     @Test
     void testRequestCounting() {
-        // Test that requests are properly counted
         when(rateLimiter.getRequestCount(TEST_CLIENT_ID)).thenReturn(50);
         when(rateLimiter.canMakeRequest(TEST_CLIENT_ID)).thenReturn(true);
         
@@ -74,53 +69,47 @@ class RateLimitingTest {
         verify(rateLimiter).incrementRequestCount(TEST_CLIENT_ID);
     }
 
-    @Test
-    void testWindowDuration() {
-        // Test that window duration is respected
-        when(rateLimiter.getLastRequestTime(TEST_CLIENT_ID)).thenReturn(Instant.now().minus(WINDOW_DURATION).plusSeconds(30));
-        assertTrue(rateLimiter.canMakeRequest(TEST_CLIENT_ID));
+    @ParameterizedTest
+    @ValueSource(strings = {"10", "30", "45"})
+    void testWindowDuration(String seconds) {
+        int secondsValue = Integer.parseInt(seconds);
+        when(rateLimiter.getLastRequestTime(TEST_CLIENT_ID))
+            .thenReturn(Instant.now().minus(WINDOW_DURATION).plusSeconds(secondsValue));
+        
+        assertThat(rateLimiter.canMakeRequest(TEST_CLIENT_ID))
+            .isEqualTo(secondsValue < WINDOW_DURATION.getSeconds());
     }
 
-    @Test
-    void testInvalidClientId() {
-        // Test handling of invalid client IDs
-        String invalidClientId = "";
-        assertFalse(rateLimiter.canMakeRequest(invalidClientId));
+    @ParameterizedTest
+    @ValueSource(strings = {"", " ", "invalid"})
+    void testInvalidClientId(String invalidClientId) {
+        assertThat(rateLimiter.canMakeRequest(invalidClientId)).isFalse();
     }
 
     @Test
     void testConcurrentRequests() {
-        // Test concurrent request handling
         String client1 = "client1";
         String client2 = "client2";
         
         when(rateLimiter.getRequestCount(client1)).thenReturn(99);
         when(rateLimiter.getRequestCount(client2)).thenReturn(99);
         
-        assertFalse(rateLimiter.canMakeRequest(client1));
-        assertFalse(rateLimiter.canMakeRequest(client2));
+        assertThat(rateLimiter.canMakeRequest(client1)).isFalse();
+        assertThat(rateLimiter.canMakeRequest(client2)).isFalse();
     }
 
     @Test
-    void testRequestTiming() {
-        // Test request timing and rate limiting
-        when(rateLimiter.getRequestCount(TEST_CLIENT_ID)).thenReturn(50);
-        when(rateLimiter.getLastRequestTime(TEST_CLIENT_ID)).thenReturn(Instant.now().minusSeconds(30));
-        assertTrue(rateLimiter.canMakeRequest(TEST_CLIENT_ID));
+    void testRequestCountOverflow() {
+        when(rateLimiter.getRequestCount(TEST_CLIENT_ID)).thenReturn(Integer.MAX_VALUE);
+        
+        assertThat(rateLimiter.canMakeRequest(TEST_CLIENT_ID)).isFalse();
     }
 
     @Test
-    void testRateLimitingWithMultipleWindows() {
-        // Test rate limiting across multiple windows
-        when(rateLimiter.getRequestCount(TEST_CLIENT_ID)).thenReturn(MAX_REQUESTS);
-        when(rateLimiter.getLastRequestTime(TEST_CLIENT_ID)).thenReturn(Instant.now().minus(WINDOW_DURATION).plusSeconds(30));
-        assertTrue(rateLimiter.canMakeRequest(TEST_CLIENT_ID));
-    }
-
-    @Test
-    void testRateLimitingWithZeroRequests() {
-        // Test rate limiting when no requests have been made
-        when(rateLimiter.getRequestCount(TEST_CLIENT_ID)).thenReturn(0);
-        assertTrue(rateLimiter.canMakeRequest(TEST_CLIENT_ID));
+    void testZeroWindowDuration() {
+        when(rateLimiter.getLastRequestTime(TEST_CLIENT_ID))
+            .thenReturn(Instant.now());
+        
+        assertThat(rateLimiter.canMakeRequest(TEST_CLIENT_ID)).isTrue();
     }
 }

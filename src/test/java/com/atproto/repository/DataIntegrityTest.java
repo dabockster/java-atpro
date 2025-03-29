@@ -1,13 +1,18 @@
 package com.atproto.repository;
 
 import com.atproto.syntax.Cid;
+import org.assertj.core.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.CsvSource;
 import java.io.IOException;
 import java.nio.file.Path;
 import java.util.Map;
-import static org.junit.jupiter.api.Assertions.*;
+
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 public class DataIntegrityTest {
     @TempDir
@@ -33,41 +38,29 @@ public class DataIntegrityTest {
         
         // Then: CAR file contains all records
         Map<String, Cid> records = carFile.getRecords();
-        assertTrue(records.containsKey(recordPath), "CAR file should contain the record");
+        assertThat(records).containsKey(recordPath);
         
         // And: CAR file can be read back correctly
         Repository fromCar = Repository.fromCarFile(carFile);
-        assertEquals(repository.getLatestVersion(), fromCar.getLatestVersion(), "Versions should match");
-        assertEquals(repository.getRecords(), fromCar.getRecords(), "Records should match");
+        assertThat(fromCar.getLatestVersion()).isEqualTo(repository.getLatestVersion());
+        assertThat(fromCar.getRecords()).isEqualTo(repository.getRecords());
     }
     
-    @Test
-    void testCidValidation() {
-        // Given: Valid and invalid CID strings
-        String[] validCids = {
-            "bafkreic4j7375b4273q3q3q3q3q3q3q3q3q3q3q3q3q3q3q3q3q3q3q3q3q3q3q3q3q3q3q3q3q3q3q3q3q3q3q3q3q3q3q3q3q3q3q3q3q3q3q3q3q3q3q3q3q3q3q3q3q3q3q",
-            "bafkreic4j7375b4273q3q3q3q3q3q3q3q3q3q3q3q3q3q3q3q3q3q3q3q3q3q3q3q3q3q3q3q3q3q3q3q3q3q3q3q3q3q3q3q3q3q3q3q3q3q3q3q3q3q3q3q3q3q3q3q3q3q3q"
-        };
-        
-        // When: Validating valid CIDs
-        for (String cidStr : validCids) {
+    @ParameterizedTest
+    @CsvSource({
+        "bafkreic4j7375b4273q3q3q3q3q3q3q3q3q3q3q3q3q3q3q3q3q3q3q3q3q3q3q3q3q3q3q3q3q3q3q3q3q3q3q3q3q3q3q3q3q3q3q3q3q3q3q3q3q3q3q3q3q3q3q3q3q3q3q, true",
+        "invalid-cid, false",
+        "bafkreic4j7375b4273q3q3q3q3q3q3q3q3q3q3q3q3q3q3q3q3q3q3q3q3q3q3q3q3q3q3q3q3q3q3q3q3q3q3q3q3q3q3q3q3q3q3q3q3q3q3q3q3q3q3q3q3q3q3q3q3q3q3qextra, false",
+        "short, false"
+    })
+    void testCidValidation(String cidStr, boolean isValid) {
+        if (isValid) {
             Cid cid = Cid.fromBase32(cidStr);
-            assertNotNull(cid, "CID should not be null");
-            assertEquals(cidStr, cid.toBase32(), "CID round trip should match original");
-        }
-        
-        // Then: Invalid CIDs should throw IllegalArgumentException
-        String[] invalidCids = {
-            "invalid-cid",
-            "bafkreic4j7375b4273q3q3q3q3q3q3q3q3q3q3q3q3q3q3q3q3q3q3q3q3q3q3q3q3q3q3q3q3q3q3q3q3q3q3q3q3q3q3q3q3q3q3q3q3q3q3q3q3q3q3q3q3q3q3q3q3q3q3qextra",
-            "short"
-        };
-        
-        for (String cidStr : invalidCids) {
-            assertThrows(IllegalArgumentException.class, 
-                () -> Cid.fromBase32(cidStr),
-                "Invalid CID should throw IllegalArgumentException"
-            );
+            assertThat(cid).isNotNull();
+            assertThat(cid.toBase32()).isEqualTo(cidStr);
+        } else {
+            assertThatThrownBy(() -> Cid.fromBase32(cidStr))
+                .isInstanceOf(IllegalArgumentException.class);
         }
     }
     
@@ -91,18 +84,16 @@ public class DataIntegrityTest {
         
         // Then: All records should be present and correct
         Map<String, Cid> records = repository.getRecords();
-        assertTrue(records.containsKey(path1), "Record 1 should be present");
-        assertTrue(records.containsKey(path2), "Record 2 should be present");
-        assertTrue(records.containsKey(path3), "Record 3 should be present");
+        assertThat(records).containsKeys(path1, path2, path3);
         
         // And: Data retrieval should match original data
         byte[] retrieved1 = repository.getRecord(path1);
         byte[] retrieved2 = repository.getRecord(path2);
         byte[] retrieved3 = repository.getRecord(path3);
         
-        assertArrayEquals(data1, retrieved1, "Record 1 data should match");
-        assertArrayEquals(data2, retrieved2, "Record 2 data should match");
-        assertArrayEquals(data3, retrieved3, "Record 3 data should match");
+        assertThat(retrieved1).isEqualTo(data1);
+        assertThat(retrieved2).isEqualTo(data2);
+        assertThat(retrieved3).isEqualTo(data3);
     }
     
     @Test
@@ -123,22 +114,19 @@ public class DataIntegrityTest {
         Version version2 = repository.getLatestVersion();
         
         // Then: Versions should progress correctly
-        assertNotEquals(initialVersion, version1, "Version 1 should be different from initial");
-        assertNotEquals(version1, version2, "Version 2 should be different from version 1");
+        assertThat(version1).isNotEqualTo(initialVersion);
+        assertThat(version2).isNotEqualTo(version1);
         
         // And: Version history should be maintained
         Map<Version, Map<String, Cid>> history = repository.getVersionHistory();
-        assertTrue(history.containsKey(initialVersion), "Initial version should be in history");
-        assertTrue(history.containsKey(version1), "Version 1 should be in history");
-        assertTrue(history.containsKey(version2), "Version 2 should be in history");
+        assertThat(history).containsKeys(initialVersion, version1, version2);
         
         // And: Records should exist in correct versions
         Map<String, Cid> records1 = history.get(version1);
-        assertTrue(records1.containsKey(path1), "Record 1 should exist in version 1");
-        assertFalse(records1.containsKey(path2), "Record 2 should not exist in version 1");
+        assertThat(records1).containsKey(path1);
+        assertThat(records1).doesNotContainKey(path2);
         
         Map<String, Cid> records2 = history.get(version2);
-        assertTrue(records2.containsKey(path1), "Record 1 should exist in version 2");
-        assertTrue(records2.containsKey(path2), "Record 2 should exist in version 2");
+        assertThat(records2).containsKeys(path1, path2);
     }
 }

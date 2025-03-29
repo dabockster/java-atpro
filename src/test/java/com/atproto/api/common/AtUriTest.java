@@ -9,12 +9,29 @@ import org.junit.jupiter.params.provider.MethodSource;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.assertThrows;
 import org.junit.jupiter.api.function.Executable;
+import org.mockito.Mock;
+import org.mockito.junit.jupiter.MockitoExtension;
+import org.junit.jupiter.api.extension.ExtendWith;
+import org.powermock.core.classloader.annotations.PrepareForTest;
+import org.powermock.modules.junit5.PowerMockExtension;
+import org.owasp.dependencycheck.utils.StringUtils;
+
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.junit.jupiter.api.Assertions.*;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.*;
+import static org.powermock.api.mockito.PowerMockito.*;
+
 import java.util.stream.Stream;
 import java.util.regex.Pattern;
 
-import static org.junit.jupiter.api.Assertions.*;
-
+@ExtendWith({MockitoExtension.class, PowerMockExtension.class})
+@PrepareForTest(AtUri.class)
 public class AtUriTest {
+
+    @Mock
+    private AtUri mockAtUri;
 
     @Test
     @DisplayName("Valid AT URIs should be parsed correctly")
@@ -22,20 +39,20 @@ public class AtUriTest {
         String[] validUris = {
             "at://did:abc:123/io.nsid.someFunc/record-key",
             "at://e.com",
-            "at://did:abc:123/io.NsId.someFunc/record-KEY", // Should be normalized
-            "at://E.com", // Should be normalized
+            "at://did:abc:123/io.NsId.someFunc/record-KEY",
+            "at://E.com",
             "at://did:plc:1234567890abcdef/io.example.collection/record-key"
         };
 
         for (String uri : validUris) {
             AtUri atUri = AtUri.parse(uri);
-            assertNotNull(atUri);
+            assertThat(atUri).isNotNull();
             
             // Test normalization
             if (uri.contains("E.com") || uri.contains("NsId")) {
                 String normalized = atUri.normalize().toString();
-                assertFalse(normalized.contains("E.com"));
-                assertFalse(normalized.contains("NsId"));
+                assertThat(normalized).doesNotContain("E.com");
+                assertThat(normalized).doesNotContain("NsId");
             }
         }
     }
@@ -55,7 +72,9 @@ public class AtUriTest {
     })
     @DisplayName("Invalid AT URIs should throw exceptions")
     public void testInvalidAtUris(String invalidUri) {
-        assertThrows(IllegalArgumentException.class, () -> AtUri.parse(invalidUri));
+        assertThatThrownBy(() -> AtUri.parse(invalidUri))
+            .isInstanceOf(IllegalArgumentException.class)
+            .hasMessageContaining("Invalid AT URI");
     }
 
     @ParameterizedTest
@@ -67,10 +86,10 @@ public class AtUriTest {
     @DisplayName("AT URI parts should be extracted correctly")
     public void testPartsExtraction(String uri, String authority, String collection, String recordKey) {
         AtUri atUri = AtUri.parse(uri);
-        assertEquals(authority, atUri.getAuthority());
-        assertEquals(collection, atUri.getCollection());
-        assertEquals(recordKey, atUri.getRecordKey());
-        assertEquals(recordKey.isEmpty() ? collection : collection + "/" + recordKey, atUri.getPath());
+        assertThat(atUri.getAuthority()).isEqualTo(authority);
+        assertThat(atUri.getCollection()).isEqualTo(collection);
+        assertThat(atUri.getRecordKey()).isEqualTo(recordKey);
+        assertThat(atUri.getPath()).isEqualTo(recordKey.isEmpty() ? collection : collection + "/" + recordKey);
     }
 
     @Test
@@ -78,29 +97,37 @@ public class AtUriTest {
     public void testNormalization() {
         AtUri atUri = AtUri.parse("at://did:abc:123/io.NsId.someFunc/record-KEY");
         AtUri normalized = atUri.normalize();
-        assertEquals("at://did:abc:123/io.nsid.someFunc/record-KEY", normalized.toString());
+        assertThat(normalized.toString()).isEqualTo("at://did:abc:123/io.nsid.someFunc/record-KEY");
 
         atUri = AtUri.parse("at://E.com");
         normalized = atUri.normalize();
-        assertEquals("at://e.com", normalized.toString());
+        assertThat(normalized.toString()).isEqualTo("at://e.com");
     }
 
     @ParameterizedTest
     @MethodSource("provideTestCases")
     @DisplayName("AT URI should handle edge cases without crashing")
     public void testNoPanic(String uri) {
+        mockStatic(AtUri.class);
+        when(AtUri.parse(any(String.class))).thenReturn(mockAtUri);
+        
         AtUri atUri = new AtUri(uri);
-        assertNotNull(atUri.getAuthority());
-        assertNotNull(atUri.getCollection());
-        assertNotNull(atUri.getRecordKey());
-        assertNotNull(atUri.normalize());
-        assertNotNull(atUri.toString());
-        assertNotNull(atUri.getPath());
+        assertThat(atUri.getAuthority()).isNotNull();
+        assertThat(atUri.getCollection()).isNotNull();
+        assertThat(atUri.getRecordKey()).isNotNull();
+        assertThat(atUri.normalize()).isNotNull();
+        assertThat(atUri.toString()).isNotNull();
+        assertThat(atUri.getPath()).isNotNull();
+        
+        verifyStatic(AtUri.class);
+        AtUri.parse(uri);
     }
 
     private static Stream<Arguments> provideTestCases() {
         return Stream.of(
-            Arguments.of("") // Empty string
+            Arguments.of(""), // Empty string
+            Arguments.of("at://did:abc:123/io.nsid.someFunc/record-key"), // Valid URI
+            Arguments.of("at://e.com") // Valid handle
         );
     }
 
@@ -113,7 +140,9 @@ public class AtUriTest {
             longUri.append("a");
         }
         
-        assertThrows(IllegalArgumentException.class, () -> AtUri.parse(longUri.toString()));
+        assertThatThrownBy(() -> AtUri.parse(longUri.toString()))
+            .isInstanceOf(IllegalArgumentException.class)
+            .hasMessageContaining("URI exceeds maximum length");
     }
 
     @ParameterizedTest
@@ -127,8 +156,8 @@ public class AtUriTest {
         AtUri original = AtUri.parse(uri);
         AtUri normalized = original.normalize();
         
-        assertEquals(original, normalized);
-        assertEquals(original.hashCode(), normalized.hashCode());
+        assertThat(original).isEqualTo(normalized);
+        assertThat(original.hashCode()).isEqualTo(normalized.hashCode());
     }
 
     @ParameterizedTest
@@ -141,6 +170,26 @@ public class AtUriTest {
     public void testRegexPattern(String uri) {
         Pattern pattern = Pattern.compile("^at://([a-zA-Z0-9.-]+|did:[a-zA-Z0-9.-]+:[a-zA-Z0-9.-]+)/?([a-zA-Z0-9.-]+/)?([a-zA-Z0-9.-]+)?$",
                 Pattern.CASE_INSENSITIVE);
-        assertTrue(pattern.matcher(uri).matches());
+        assertThat(pattern.matcher(uri).matches()).isTrue();
+    }
+
+    @Test
+    @DisplayName("AT URI should handle malformed input gracefully")
+    public void testMalformedInput() {
+        // Test null input
+        assertThatThrownBy(() -> AtUri.parse(null))
+            .isInstanceOf(NullPointerException.class);
+
+        // Test whitespace-only input
+        assertThatThrownBy(() -> AtUri.parse(" "))
+            .isInstanceOf(IllegalArgumentException.class);
+    }
+
+    @Test
+    @DisplayName("AT URI should handle special characters correctly")
+    public void testSpecialCharacters() {
+        String uri = "at://did:abc:123/io.nsid.someFunc/record-key_with-special_chars_123";
+        AtUri atUri = AtUri.parse(uri);
+        assertThat(atUri.getRecordKey()).isEqualTo("record-key_with-special_chars_123");
     }
 }

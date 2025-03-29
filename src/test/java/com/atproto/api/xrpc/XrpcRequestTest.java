@@ -4,6 +4,10 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.powermock.api.mockito.PowerMockito;
+import org.powermock.core.classloader.annotations.PrepareForTest;
+import org.powermock.modules.junit4.PowerMockRunnerDelegate;
+import static org.assertj.core.api.Assertions.assertThat;
 
 import java.io.IOException;
 import java.util.HashMap;
@@ -12,6 +16,8 @@ import java.util.Map;
 import static org.junit.jupiter.api.Assertions.*;
 
 @ExtendWith(MockitoExtension.class)
+@ExtendWith(PowerMockRunnerDelegate.class)
+@PrepareForTest({XrpcRequest.class})
 public class XrpcRequestTest {
 
     private static final String TEST_METHOD = "com.atproto.sync.getLatestCommit";
@@ -28,9 +34,9 @@ public class XrpcRequestTest {
 
     @Test
     public void testRequestCreation() {
-        assertNotNull(request);
-        assertEquals(TEST_METHOD, request.getMethod());
-        assertEquals(new HashMap<>(Map.of("handle", TEST_HANDLE)), request.getParams());
+        assertThat(request).isNotNull();
+        assertThat(request.getMethod()).isEqualTo(TEST_METHOD);
+        assertThat(request.getParams()).isEqualTo(new HashMap<>(Map.of("handle", TEST_HANDLE)));
     }
 
     @Test
@@ -38,14 +44,14 @@ public class XrpcRequestTest {
         Map<String, Object> params = new HashMap<>(Map.of("handle", TEST_HANDLE));
         XrpcRequest authRequest = new XrpcRequest(TEST_METHOD, params, TEST_TOKEN, null, null, null);
 
-        assertEquals(TEST_TOKEN, authRequest.getAuth());
+        assertThat(authRequest.getAuth()).isEqualTo(TEST_TOKEN);
     }
 
     @Test
     public void testRequestSerialization() throws IOException {
         String serialized = request.serialize();
-        assertTrue(serialized.contains(TEST_METHOD));
-        assertTrue(serialized.contains(TEST_HANDLE));
+        assertThat(serialized).contains(TEST_METHOD);
+        assertThat(serialized).contains(TEST_HANDLE);
     }
 
     @Test

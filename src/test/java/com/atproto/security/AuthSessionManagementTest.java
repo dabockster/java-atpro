@@ -7,6 +7,8 @@ import com.atproto.crypto.Secp256k1KeyPair;
 import com.atproto.did.DID;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
@@ -16,7 +18,8 @@ import java.time.Instant;
 import java.util.Map;
 import java.util.UUID;
 
-import static org.junit.jupiter.api.Assertions.*;
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.when;
 
@@ -54,75 +57,79 @@ class AuthSessionManagementTest {
         AuthSession session = sessionManager.createSession(request);
 
         // Then
-        assertNotNull(session);
-        assertNotNull(session.getSessionToken());
-        assertEquals(TEST_DID, session.getDID());
-        assertEquals(TEST_PDS, session.getPDS());
-        assertTrue(session.getExpiresAt().isAfter(Instant.now()));
+        assertThat(session).isNotNull();
+        assertThat(session.getSessionToken()).isNotEmpty();
+        assertThat(session.getDID()).isEqualTo(TEST_DID);
+        assertThat(session.getPDS()).isEqualTo(TEST_PDS);
+        assertThat(session.getExpiresAt()).isAfter(Instant.now());
     }
 
-    @Test
-    void testSessionCreationWithInvalidDid() {
+    @ParameterizedTest
+    @ValueSource(strings = {"invalid:did", "did:plc:invalid", "did:web:"})
+    void testSessionCreationWithInvalidDid(String invalidDid) {
         // Given
         when(request.getParams()).thenReturn(Map.of(
-            "did", "invalid:did",
+            "did", invalidDid,
             "password", TEST_PASSWORD,
             "pds", TEST_PDS,
             "authFactorToken", TEST_AUTH_FACTOR_TOKEN
         ));
 
         // When & Then
-        assertThrows(IllegalArgumentException.class, () ->
+        assertThatThrownBy(() ->
             sessionManager.createSession(request)
-        );
+        ).isInstanceOf(IllegalArgumentException.class);
     }
 
-    @Test
-    void testSessionCreationWithEmptyPassword() {
+    @ParameterizedTest
+    @ValueSource(strings = {"", " ", "123", "password"})
+    void testSessionCreationWithInvalidPassword(String invalidPassword) {
         // Given
         when(request.getParams()).thenReturn(Map.of(
             "did", TEST_DID,
-            "password", "",
+            "password", invalidPassword,
             "pds", TEST_PDS,
             "authFactorToken", TEST_AUTH_FACTOR_TOKEN
         ));
 
         // When & Then
-        assertThrows(IllegalArgumentException.class, () ->
+        assertThatThrownBy(() ->
             sessionManager.createSession(request)
-        );
+        ).isInstanceOf(IllegalArgumentException.class);
     }
 
-    @Test
-    void testSessionCreationWithInvalidPds() {
+    @ParameterizedTest
+    @ValueSource(strings = {"invalid-url", "http://invalid", "https://invalid:"})
+    void testSessionCreationWithInvalidPds(String invalidPds) {
         // Given
         when(request.getParams()).thenReturn(Map.of(
             "did", TEST_DID,
             "password", TEST_PASSWORD,
-            "pds", "invalid:pds",
+            "pds", invalidPds,
             "authFactorToken", TEST_AUTH_FACTOR_TOKEN
         ));
 
         // When & Then
-        assertThrows(IllegalArgumentException.class, () ->
+        assertThatThrownBy(() ->
             sessionManager.createSession(request)
-        );
+        ).isInstanceOf(IllegalArgumentException.class);
     }
 
-    @Test
-    void testSessionCreationWithInvalidAuthFactorToken() {
+    @ParameterizedTest
+    @ValueSource(strings = {"123", "1234", "12345", "1234567"})
+    void testSessionCreationWithInvalidAuthFactorToken(String invalidToken) {
         // Given
         when(request.getParams()).thenReturn(Map.of(
             "did", TEST_DID,
             "password", TEST_PASSWORD,
             "pds", TEST_PDS,
-            "authFactorToken", "123"
+            "authFactorToken", invalidToken
         ));
 
         // When & Then
-        assertThrows(IllegalArgumentException.class, () ->
+        assertThatThrownBy(() ->
             sessionManager.createSession(request)
-        );
+        ).isInstanceOf(IllegalArgumentException.class);
     }
 
     @Test
@@ -234,12 +241,39 @@ class AuthSessionManagementTest {
         );
     }
 
+    @Test
+    void testSessionValidation() throws Exception {
+        // Given
+        AuthSession session = createTestSession();
+        
+        // When
+        boolean isValid = sessionManager.validateSession(session.getSessionToken());
+
+        // Then
+        assertThat(isValid).isTrue();
+    }
+
+    @Test
+    void testSessionExpiration() throws Exception {
+        // Given
+        AuthSession session = createTestSession();
+        Instant now = Instant.now();
+        when(session.getExpiresAt()).thenReturn(now.minusSeconds(1));
+
+        // When
+        boolean isValid = sessionManager.validateSession(session.getSessionToken());
+
+        // Then
+        assertThat(isValid).isFalse();
+    }
+
     private AuthSession createTestSession() throws Exception {
-        return sessionManager.createSession(
-            TEST_DID,
-            TEST_PASSWORD,
-            TEST_PDS,
-            TEST_AUTH_FACTOR_TOKEN
-        );
+        when(request.getParams()).thenReturn(Map.of(
+            "did", TEST_DID,
+            "password", TEST_PASSWORD,
+            "pds", TEST_PDS,
+            "authFactorToken", TEST_AUTH_FACTOR_TOKEN
+        ));
+        return sessionManager.createSession(request);
     }
 }

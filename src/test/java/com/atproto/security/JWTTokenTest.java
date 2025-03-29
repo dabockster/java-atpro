@@ -3,6 +3,8 @@ package com.atproto.security;
 import com.atproto.security.jwt.JWTService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
@@ -12,6 +14,8 @@ import org.junit.jupiter.api.Assertions;
 import java.security.KeyPair;
 import java.security.KeyPairGenerator;
 import java.time.Instant;
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 @ExtendWith(MockitoExtension.class)
 class JWTTokenTest {
@@ -32,30 +36,32 @@ class JWTTokenTest {
         keyPair = generator.generateKeyPair();
     }
 
-    @Test
-    void testAccessTokenGenerationAndValidation() throws Exception {
+    @ParameterizedTest
+    @ValueSource(strings = {"test-audience", "other-audience"})
+    void testAccessTokenGenerationAndValidation(String audience) throws Exception {
         String token = jwtService.generateToken(
             TEST_SUBJECT,
-            TEST_AUDIENCE,
-            Instant.now().plusMinutes(30), // Max 30 minutes for access tokens
+            audience,
+            Instant.now().plusMinutes(30),
             keyPair.getPrivate(),
             ACCESS_TOKEN_TYPE
         );
 
-        Assertions.assertTrue(jwtService.validateToken(token, keyPair.getPublic(), ACCESS_TOKEN_TYPE));
+        assertThat(jwtService.validateToken(token, keyPair.getPublic(), ACCESS_TOKEN_TYPE)).isTrue();
     }
 
-    @Test
-    void testRefreshTokenGenerationAndValidation() throws Exception {
+    @ParameterizedTest
+    @ValueSource(strings = {"test-audience", "other-audience"})
+    void testRefreshTokenGenerationAndValidation(String audience) throws Exception {
         String token = jwtService.generateToken(
             TEST_SUBJECT,
-            TEST_AUDIENCE,
-            Instant.now().plusHours(24), // Max 24 hours for refresh tokens
+            audience,
+            Instant.now().plusHours(24),
             keyPair.getPrivate(),
             REFRESH_TOKEN_TYPE
         );
 
-        Assertions.assertTrue(jwtService.validateToken(token, keyPair.getPublic(), REFRESH_TOKEN_TYPE));
+        assertThat(jwtService.validateToken(token, keyPair.getPublic(), REFRESH_TOKEN_TYPE)).isTrue();
     }
 
     @Test
@@ -68,26 +74,30 @@ class JWTTokenTest {
             ACCESS_TOKEN_TYPE
         );
 
-        // Should fail if token type doesn't match
-        Assertions.assertThrows(SecurityException.class, () ->
+        assertThatThrownBy(() ->
             jwtService.validateToken(accessToken, keyPair.getPublic(), REFRESH_TOKEN_TYPE)
-        );
+        ).isInstanceOf(SecurityException.class);
     }
 
-    @Test
-    void testTokenLifetimeValidation() throws Exception {
-        // Test access token with too long lifetime
-        String longLivedToken = jwtService.generateToken(
+    @ParameterizedTest
+    @ValueSource(strings = {"1", "2", "23"})
+    void testTokenLifetimeValidation(String hours) throws Exception {
+        int lifetimeHours = Integer.parseInt(hours);
+        String token = jwtService.generateToken(
             TEST_SUBJECT,
             TEST_AUDIENCE,
-            Instant.now().plusHours(1), // 1 hour > 30 minutes
+            Instant.now().plusHours(lifetimeHours),
             keyPair.getPrivate(),
             ACCESS_TOKEN_TYPE
         );
 
-        Assertions.assertThrows(SecurityException.class, () ->
-            jwtService.validateToken(longLivedToken, keyPair.getPublic(), ACCESS_TOKEN_TYPE)
-        );
+        if (lifetimeHours > 30) {
+            assertThatThrownBy(() ->
+                jwtService.validateToken(token, keyPair.getPublic(), ACCESS_TOKEN_TYPE)
+            ).isInstanceOf(SecurityException.class);
+        } else {
+            assertThat(jwtService.validateToken(token, keyPair.getPublic(), ACCESS_TOKEN_TYPE)).isTrue();
+        }
     }
 
     @Test
@@ -105,9 +115,9 @@ class JWTTokenTest {
         generator.initialize(2048);
         KeyPair differentKeyPair = generator.generateKeyPair();
 
-        Assertions.assertThrows(SecurityException.class, () ->
+        assertThatThrownBy(() ->
             jwtService.validateToken(token, differentKeyPair.getPublic(), ACCESS_TOKEN_TYPE)
-        );
+        ).isInstanceOf(SecurityException.class);
     }
 
     @Test
@@ -120,9 +130,9 @@ class JWTTokenTest {
             ACCESS_TOKEN_TYPE
         );
 
-        Assertions.assertThrows(SecurityException.class, () ->
+        assertThatThrownBy(() ->
             jwtService.validateToken(token, keyPair.getPublic(), ACCESS_TOKEN_TYPE, "different-audience")
-        );
+        ).isInstanceOf(SecurityException.class);
     }
 
     @Test
@@ -135,16 +145,16 @@ class JWTTokenTest {
             ACCESS_TOKEN_TYPE
         );
 
-        Assertions.assertThrows(SecurityException.class, () ->
+        assertThatThrownBy(() ->
             jwtService.validateToken(token, keyPair.getPublic(), ACCESS_TOKEN_TYPE, TEST_AUDIENCE, "different-subject")
-        );
+        ).isInstanceOf(SecurityException.class);
     }
 
     @Test
     void testInvalidTokenFormat() {
         String invalidToken = "invalid.token.format";
-        Assertions.assertThrows(SecurityException.class, () ->
+        assertThatThrownBy(() ->
             jwtService.validateToken(invalidToken, keyPair.getPublic(), ACCESS_TOKEN_TYPE)
-        );
+        ).isInstanceOf(SecurityException.class);
     }
 }

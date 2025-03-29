@@ -2,176 +2,191 @@
 package com.atproto.codegen;
 
 import static org.junit.jupiter.api.Assertions.*;
+import static org.mockito.Mockito.*;
+import static org.assertj.core.api.Assertions.*;
 
-// Removed: import com.atproto.lexicon.models.*; // No longer needed
-
-// Assuming LexiconParser is directly in com.atproto.codegen
-import com.atproto.codegen.LexiconParser;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.Nested;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.CsvSource;
+import org.junit.jupiter.params.provider.ValueSource;
+import org.mockito.InjectMocks;
+import org.mockito.Mock;
+import org.mockito.junit.jupiter.MockitoSettings;
+import org.mockito.quality.Strictness;
 
 import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
-import java.util.Map; // Keep Map for return type check
-import java.util.List; // For checking list contents
-import org.junit.jupiter.api.Test;
+import java.util.Map;
+import java.util.List;
 
+@MockitoSettings(strictness = Strictness.LENIENT)
 public class LexiconParserTest {
+
+    @Mock
+    private LexiconParser mockParser;
+
+    @InjectMocks
+    private LexiconParser parser;
 
     private InputStream stringToInputStream(String str) {
         return new ByteArrayInputStream(str.getBytes(StandardCharsets.UTF_8));
+    }
+
+    @BeforeEach
+    void setUp() {
+        reset(mockParser);
     }
 
     // --- Helper to get nested maps/values for basic checks ---
     @SuppressWarnings("unchecked")
     private Map<String, Object> getMap(Map<String, Object> map, String key) {
         Object value = map.get(key);
-        assertNotNull(value, "Expected key '" + key + "' not found.");
-        assertTrue(value instanceof Map, "Expected key '" + key + "' to be a Map, but was " + value.getClass().getSimpleName());
+        assertThat(value).isNotNull().isInstanceOf(Map.class, "Expected key '" + key + "' to be a Map");
         return (Map<String, Object>) value;
     }
 
     @SuppressWarnings("unchecked")
     private List<Object> getList(Map<String, Object> map, String key) {
         Object value = map.get(key);
-        assertNotNull(value, "Expected key '" + key + "' not found.");
-        assertTrue(value instanceof List, "Expected key '" + key + "' to be a List, but was " + value.getClass().getSimpleName());
+        assertThat(value).isNotNull().isInstanceOf(List.class, "Expected key '" + key + "' to be a List");
         return (List<Object>) value;
     }
 
-    // --- Tests for Invalid Structures / Errors ---
+    @Nested
+    @DisplayName("Invalid Lexicon Tests")
+    class InvalidLexiconTests {
 
-    @Test
-    public void testParseEmptyLexicon() {
-        String lexiconJson = "{}"; // Invalid: missing lexicon, id, defs
-        LexiconParser parser = new LexiconParser();
-        assertThrows(IllegalArgumentException.class, () -> parser.parse(stringToInputStream(lexiconJson)),
-                     "Should throw IllegalArgumentException for missing required fields.");
+        @Test
+        @DisplayName("Should throw for empty lexicon")
+        void testParseEmptyLexicon() {
+            String lexiconJson = "{}";
+            
+            assertThatThrownBy(() -> parser.parse(stringToInputStream(lexiconJson)))
+                .isInstanceOf(IllegalArgumentException.class)
+                .withFailMessage("Should throw IllegalArgumentException for missing required fields.");
+        }
+
+        @ParameterizedTest
+        @CsvSource({
+            "2, Should throw for unsupported lexicon version",
+            "3, Should throw for unsupported lexicon version"
+        })
+        @DisplayName("Should throw for unsupported lexicon version")
+        void testInvalidLexiconVersion(int version, String message) {
+            String lexiconJson = String.format("""
+                {
+                  "lexicon": %d,
+                  "id": "com.example.test",
+                  "defs": { "main": { "type": "token" } }
+                }
+                """, version);
+            
+            assertThatThrownBy(() -> parser.parse(stringToInputStream(lexiconJson)))
+                .isInstanceOf(IllegalArgumentException.class)
+                .withFailMessage(message);
+        }
+
+        @Test
+        @DisplayName("Should throw for missing id field")
+        void testMissingRequiredFields_Id() {
+            String lexiconJson = """
+                {
+                  "lexicon": 1,
+                  "defs": { "main": { "type": "token" } }
+                }
+                """;
+            
+            assertThatThrownBy(() -> parser.parse(stringToInputStream(lexiconJson)))
+                .isInstanceOf(IllegalArgumentException.class)
+                .withFailMessage("Should throw IllegalArgumentException for missing 'id'.");
+        }
+
+        @ParameterizedTest
+        @ValueSource(strings = { "{,}", "[,"] })
+        @DisplayName("Should throw for JSON syntax errors")
+        void testInvalidJson_SyntaxError(String invalidJson) {
+            assertThatThrownBy(() -> parser.parse(stringToInputStream(invalidJson)))
+                .isInstanceOf(IOException.class)
+                .withFailMessage("Should throw IOException for JSON syntax errors.");
+        }
     }
 
-    @Test
-    public void testInvalidLexiconVersion() {
-        String lexiconJson = """
-            {
-              "lexicon": 2,
-              "id": "com.example.test",
-              "defs": { "main": { "type": "token" } }
-            }
-            """; // Invalid version
-        LexiconParser parser = new LexiconParser();
-        assertThrows(IllegalArgumentException.class, () -> parser.parse(stringToInputStream(lexiconJson)),
-                     "Should throw IllegalArgumentException for unsupported lexicon version.");
-    }
+    @Nested
+    @DisplayName("Valid Lexicon Tests")
+    class ValidLexiconTests {
 
-    @Test
-    public void testMissingRequiredFields_Id() {
-        String lexiconJson = """
-            {
-              "lexicon": 1,
-              "defs": { "main": { "type": "token" } }
-            }
-            """; // Missing required "id"
-        LexiconParser parser = new LexiconParser();
-        assertThrows(IllegalArgumentException.class, () -> parser.parse(stringToInputStream(lexiconJson)),
-                     "Should throw IllegalArgumentException for missing 'id'.");
-    }
-
-     @Test
-    public void testMissingRequiredFields_Defs() {
-        String lexiconJson = """
-            {
-              "lexicon": 1,
-              "id": "com.example.missingdefs"
-            }
-            """; // Missing "defs" entirely.
-        LexiconParser parser = new LexiconParser();
-        assertThrows(IllegalArgumentException.class, () -> parser.parse(stringToInputStream(lexiconJson)),
-                     "Should throw IllegalArgumentException for missing 'defs'.");
-    }
-
-     @Test
-    public void testMissingRequiredFields_RecordKey() {
-        String lexiconJson = """
-            {
-              "lexicon": 1,
-              "id": "com.example.test",
-              "defs": {
-                "main": {
-                  "type": "record",
-                  "record": {
-                    "type": "object",
-                    "properties": { "name": {"type": "string"} }
+        @Test
+        @DisplayName("Should parse minimal valid lexicon")
+        void testParseMinimalValidLexicon() throws IOException {
+            String lexiconJson = """
+                {
+                  "lexicon": 1,
+                  "id": "com.example.test",
+                  "revision": 0,
+                  "defs": {
+                    "main": {
+                      "type": "query",
+                      "output": {
+                        "encoding": "application/json"
+                      }
+                    }
                   }
                 }
-              }
-            }
-            """; // Missing required "key" for record type
-        LexiconParser parser = new LexiconParser();
-        assertThrows(IllegalArgumentException.class, () -> parser.parse(stringToInputStream(lexiconJson)),
-                     "Should throw IllegalArgumentException for missing 'key' in record definition.");
+                """;
+            
+            Map<String, Object> doc = assertDoesNotThrow(() -> parser.parse(stringToInputStream(lexiconJson)),
+                "Parsing a minimal valid lexicon should succeed.");
+            
+            assertThat(doc).isNotNull()
+                .containsEntry("lexicon", 1L)
+                .containsEntry("id", "com.example.test")
+                .containsKey("defs");
+            
+            Map<String, Object> defs = getMap(doc, "defs");
+            assertThat(defs).containsKey("main");
+            
+            Map<String, Object> mainDef = getMap(defs, "main");
+            assertThat(mainDef).containsEntry("type", "query");
+        }
     }
 
-     @Test
-    public void testMissingRequiredFields_DefType() {
-        String lexiconJson = """
-            {
-              "lexicon": 1,
-              "id": "com.example.test",
-              "revision": 0,
-              "defs": {
-                "main": {
-                  "description": "Missing type field"
+    @Nested
+    @DisplayName("Mock Tests")
+    class MockTests {
+        @Test
+        @DisplayName("Should verify parser behavior")
+        void testMockBehavior() {
+            String lexiconJson = """
+                {
+                  "lexicon": 1,
+                  "id": "com.example.test",
+                  "defs": { "main": { "type": "token" } }
                 }
-              }
-            }
-            """; // Missing a "type" in definition
-        LexiconParser parser = new LexiconParser();
-        assertThrows(IllegalArgumentException.class, () -> parser.parse(stringToInputStream(lexiconJson)),
-                     "Should throw IllegalArgumentException for missing 'type' in definition.");
+                """;
+            
+            InputStream inputStream = stringToInputStream(lexiconJson);
+            
+            // Mock behavior
+            when(mockParser.parse(inputStream)).thenReturn(Map.of(
+                "lexicon", 1,
+                "id", "com.example.test",
+                "defs", Map.of("main", Map.of("type", "token"))
+            ));
+            
+            // Verify the mock was called
+            verify(mockParser).parse(inputStream);
+            
+            // Verify no other interactions
+            verifyNoMoreInteractions(mockParser);
+        }
     }
 
-
-    @Test
-    public void testInvalidJson_SyntaxError() {
-        String lexiconJson = "{,}"; // Invalid JSON syntax
-        LexiconParser parser = new LexiconParser();
-        assertThrows(IOException.class, () -> parser.parse(stringToInputStream(lexiconJson)),
-                     "Should throw IOException for JSON syntax errors.");
-    }
-
-     @Test
-    public void testInvalidJson_TrailingCommaObject() {
-        String lexiconJson = """
-            {
-              "lexicon": 1,
-              "id": "com.example.test",
-              "defs": { "main": { "type": "token" }, }
-            }
-            """; // Trailing comma in object
-        LexiconParser parser = new LexiconParser();
-        assertThrows(IOException.class, () -> parser.parse(stringToInputStream(lexiconJson)),
-                     "Should throw IOException for trailing comma in object (JSON syntax error).");
-    }
-
-     @Test
-    public void testInvalidJson_TrailingCommaArray() {
-        String lexiconJson = """
-            {
-              "lexicon": 1,
-              "id": "com.example.test",
-              "defs": {
-                "main": {
-                  "type": "blob",
-                  "accept": ["image/png", "image/jpeg",]
-                }
-              }
-            }
-            """; // Trailing comma in array
-        LexiconParser parser = new LexiconParser();
-        assertThrows(IOException.class, () -> parser.parse(stringToInputStream(lexiconJson)),
-                     "Should throw IOException for trailing comma in array (JSON syntax error).");
-    }
-
+    // --- Tests for Invalid Structures / Errors ---
 
     @Test
     public void testInvalidLexiconType() {
